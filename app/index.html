@@ -3,20 +3,89 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Cover Snap</title>
+<title>VICE FORGE — GTA-style poster maker</title>
 <link rel="stylesheet" href="./style.css">
 </head>
 <body>
-<main class="app">
-  <section class="controls">
-    <h1>Cover Snap</h1>
-    <p>A photo and a caption, made into a square cover.</p>
-    <label>Photo <input id="photo" type="file" accept="image/*"></label>
-    <label>Caption <input id="caption" type="text" maxlength="40" value="Sunset Heist"></label>
-    <button id="export" type="button">Export PNG 1080 x 1080</button>
-    <p id="status" role="status"></p>
+<main class="app" id="app">
+
+  <aside class="sidebar" id="sidebar">
+    <header class="brand">
+      <div class="brand-mark">
+        <span class="brand-vice">VICE</span><span class="brand-forge">FORGE</span>
+      </div>
+      <p class="brand-sub">GTA-style poster covers, forged from your own photos. Offline, no upload.</p>
+    </header>
+
+    <section class="panel">
+      <h2>Photos</h2>
+      <div class="row">
+        <button id="addPhotos" type="button" class="btn btn-accent">Add photos</button>
+        <span class="mini" id="photoCount">0 / 8</span>
+      </div>
+      <p class="mini">Or drop images anywhere on the page. Up to 8 photos, each with its own crop.</p>
+      <ul class="photo-strip" id="photoStrip" aria-label="Loaded photos"></ul>
+      <p class="mini" id="photoHint">Add a photo to begin — panels fill in order.</p>
+    </section>
+
+    <section class="panel" id="panelPanel">
+      <h2>Selected panel <span class="mini" id="panelId">—</span></h2>
+      <label class="field">
+        <span>Fill with</span>
+        <select id="panelFill"></select>
+      </label>
+      <div class="row">
+        <button id="autoFrame" type="button" class="btn">Auto-frame</button>
+        <button id="resetCrop" type="button" class="btn">Reset crop</button>
+      </div>
+      <p class="mini">On the preview: click a panel to select it, drag to pan, wheel to zoom.</p>
+    </section>
+
+    <section class="panel">
+      <h2>Layout</h2>
+      <div class="seg" id="layoutSeg" role="group" aria-label="Layout"></div>
+      <h2>Size</h2>
+      <div class="seg" id="sizeSeg" role="group" aria-label="Export size"></div>
+      <h2>Colour grade</h2>
+      <div class="looks" id="lookSeg" role="group" aria-label="Colour grade"></div>
+      <label class="check">
+        <input type="checkbox" id="artToggle" checked>
+        <span>Sunset art panel (drawn by code)</span>
+      </label>
+      <div class="row">
+        <button id="reseed" type="button" class="btn" title="New random seed for art & grain">Reseed art &#10227;</button>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Lettering</h2>
+      <label class="field">
+        <span>Headline</span>
+        <input id="headline" type="text" maxlength="26" value="VICE CITY HEIST" spellcheck="false">
+      </label>
+      <label class="field">
+        <span>Tagline</span>
+        <input id="tagline" type="text" maxlength="64" value="ONE NIGHT. TWO KEYS. NO MERCY." spellcheck="false">
+      </label>
+      <label class="field">
+        <span>Credit strip</span>
+        <input id="credit" type="text" maxlength="64" value="VICE FORGE · ISSUE 01 · 2026" spellcheck="false">
+      </label>
+    </section>
+
+    <section class="panel export-panel">
+      <button id="export" type="button" class="btn btn-export">Export PNG</button>
+      <p class="mini" id="status" role="status">Ready.</p>
+    </section>
+  </aside>
+
+  <section class="stage" id="stage">
+    <div class="stage-inner" id="stageInner">
+      <canvas id="cover" width="1080" height="1080" aria-label="Cover preview"></canvas>
+    </div>
+    <footer class="hint" id="hint">Click a panel to select · drag to pan · wheel to zoom · drop photos to add</footer>
   </section>
-  <canvas id="cover" width="1080" height="1080" aria-label="The cover"></canvas>
+
 </main>
 <script type="module" src="./src/main.js"></script>
 </body>
