@@ -1,5 +1,6 @@
-// Seeded randomness: every stochastic stroke (art panel, grain, sparkles) comes from a
-// mulberry32 stream seeded by the cover's seed, so a ?seed= screenshot is reproducible.
+// Seeded randomness: every stochastic choice in the poster (panel shuffle, grade jitter, label
+// times, art-panel scenery) comes from a mulberry32 stream seeded by the cover's seed, so a
+// ?seed= screenshot is byte-stable across runs. The app never touches Math.random.
 
 /** Creates a deterministic [0,1) generator for a 32-bit seed. */
 export function makeRng(seed) {
@@ -21,4 +22,24 @@ export function seedFromString(text) {
     h = Math.imul(h, 16777619);
   }
   return h >>> 0;
+}
+
+/** Fisher-Yates shuffle driven by an rng function; returns a new array. */
+export function shuffled(rng, list) {
+  const out = list.slice();
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [out[i], out[j]] = [out[j], out[i]];
+  }
+  return out;
+}
+
+/** One seeded float in [lo, hi). */
+export function between(rng, lo, hi) {
+  return lo + rng() * (hi - lo);
+}
+
+/** One seeded integer in [lo, hi]. */
+export function intBetween(rng, lo, hi) {
+  return lo + Math.floor(rng() * (hi - lo + 1));
 }

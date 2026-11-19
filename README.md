@@ -4,7 +4,11 @@
 [![rank](https://make.fun/badge/gta6-cover-art-01/eziebatozai/gta6-cover-art/rank.svg)](https://make.fun/bounty/gta6-cover-art-01/leaderboard?utm_source=github&utm_medium=readme&utm_campaign=gta6-cover-art-01)
 [![reward](https://make.fun/badge/gta6-cover-art-01/eziebatozai/gta6-cover-art/reward.svg)](https://make.fun/bounty/gta6-cover-art-01?utm_source=github&utm_medium=readme&utm_campaign=gta6-cover-art-01)
 
-VICE FORGE is an offline web app that turns your own photos into bold multi-panel GTA-style poster covers — colour-graded panels, a code-drawn Vice City sunset art panel, arched poster lettering — exported as PNG for the common post sizes.
+VICE FORGE is an offline web app that forges your own photos into a dense, multi-panel
+GTA-style poster cover — a big hero shot beside a mosaic of graded scene plates, every panel
+with its own cinematic colour grade and a locator label, capped by a huge arched headline,
+a script accent, a press quote, chips and an EST. 2026 rosette — exported as PNG for the
+common post sizes.
 
 ## Run it
 
@@ -12,24 +16,54 @@ VICE FORGE is an offline web app that turns your own photos into bold multi-pane
 node serve.ts
 ```
 
-Then open http://localhost:8080 in desktop Chrome. Everything runs from static files under `app/` with no network, no build step and no uploads: your photos stay on your machine.
+Then open http://localhost:8080 in desktop Chrome. Everything runs from static files under
+`app/` with no network, no build step and no uploads: your photos stay on your machine.
 
 ### Features
 
-- **Poster layouts** — the flagship six-panel poster grid, a triptych and a hero layout, each with white gutters and a white poster margin; switch between 1080×1080, 1080×1350 and 1920×1080.
-- **Any photo, up to 8** — file picker, drag & drop, or the two bundled samples. Every photo keeps its own crop: click a panel to select it, drag to pan, wheel to zoom, with auto-frame and reset per panel. One photo can fill several panels, several photos one layout, and any panel can become the drawn art panel or a colour wash.
-- **The art panel** — a 1980s Miami sunset drawn entirely with canvas paths and gradients: layered gradient sky bands, a big slatted sun with glow, a seeded skyline with lit windows, water with a sun reflection, palm silhouettes, birds and sparkles. Reseed it with one click.
-- **Cinematic colour grades** — five live looks (Sunset, Neon, Vice, Heat, Noir) built from a tritone gradient map with contrast, colour wash, bloom, chromatic fringing, vignette and film grain.
-- **Poster lettering** — an arched Anton headline with thick ink stroke, gradient fill and inner highlight; a tracked Bebas Neue tagline; an ISSUE 01 · 2026 badge; and a bottom credit strip. Auto-fitting keeps long text inside the poster.
-- **Deterministic shot mode** — `?shot=cover&size=1920x1080&look=vice&photo=samples/pier.jpg&caption=Vice City Heist` renders a reproducible cover (seeded randomness, no `Math.random`) for screenshots and CI.
+- **The Collage layout** (flagship, and the default) — one big portrait hero panel on the left
+  and a mosaic of five panels of different sizes on the right (wide landscape, two squares,
+  a wide bottom panel, a tall strip), white gutters, a cream poster margin and a thin dark
+  inner border per panel. The same composition adapts to 1080×1080, 1080×1350 and 1920×1080;
+  a poster grid and a triptych are one click away.
+- **Eight scene plates** — public-domain and CC0 photographs (Miami neon, Art Deco, Route
+  Motel, the pier, the marina at night, sunset water) plus the two image-model starters; see
+  `app/samples/CREDITS.md`. Add your own photos on top: each panel takes any plate or photo.
+- **A colour grade per panel** — five looks (Sunset, Neon, Vice, Heat, Noir) dealt from the
+  seed so neighbouring panels never match: a split-tone film chain (cool shadows, warm
+  highlights) with a skin-tone guard that keeps faces believable, a low-strength tritone
+  gradient map, wash, bloom, chromatic fringe, vignette and grain.
+- **Locator labels** — a dark translucent bar on every panel with a bold caps name and a
+  detail line ("NEON BOULEVARD / 11:05 PM · OCEAN DRIVE"), seeded defaults, editable per panel.
+- **The caption band** — a five-star row with a press quote, chips ("VOL. 06"), an EST. 2026
+  rosette, the huge arched Anton headline with thick cream outline, warm gradient fill and
+  drop shadow (auto-fitting to one or two lines), and a Pacifico script accent; below it a
+  thin tracked Bebas credit strip.
+- **A real editor** — dark three-column UI: scene-plate tray on the left, live canvas in the
+  middle, panel inspector on the right (fill, look, locator text, auto-frame, reset). Click a
+  panel to select, drag to pan its crop, wheel to zoom, arrows to nudge, Tab to cycle, E to
+  export. Export writes `vice-forge-<slug>-<w>x<h>.png` at the exact size via `canvas.toBlob`.
+- **The Vice Sunset art panel** — a 1980s Miami sunset drawn entirely with canvas paths and
+  gradients (seeded skyline, palms, slatted sun, mirrored-water reflection) as an optional
+  extra panel choice.
+- **Deterministic shot mode** — `?shot=cover&size=1920x1080&layout=collage&seed=7&plates=…`
+  renders a reproducible cover (seeded randomness, no `Math.random`) for screenshots and CI.
 
 ### How it works
 
-The renderer (`app/src/cover-renderer.js`) composes the whole poster on one canvas at the exact export size: layout rectangles from `collage-layout.js`, photo crops from `crop-transform.js`, a graded photo per panel from `color-grade.js` (scratch-canvas grade chain), the procedural sunset from `art-panel.js`, type from `lettering.js`, and the export path in `exporter.js`. No third-party JavaScript libraries.
+The renderer (`app/src/cover-renderer.js`) composes the whole poster on one canvas at the
+exact export size: layout rectangles from `collage-layout.js`, photo crops from
+`crop-transform.js`, a graded photo per panel from `color-grade.js`, the procedural sunset
+from `art-panel.js`, locator labels from `labels.js`, the caption band from
+`caption-band.js` (type from `lettering.js`), and the export path in `exporter.js`. The eight
+plates are preloaded by `plates.js`; state and seeding live in `state.js`. No third-party
+JavaScript libraries.
 
 ### Fonts
 
-The app ships two font files under `app/fonts/`, both under the SIL Open Font License 1.1 (licence texts beside them): **Anton** (The Anton Project Authors) and **Bebas Neue** (Dharma Type). Everything else uses system fonts.
+The app ships three font files under `app/fonts/`, all under the SIL Open Font License 1.1
+(see `app/fonts/LICENSES.md`): **Anton** (The Anton Project Authors), **Bebas Neue** (Dharma
+Type) and **Pacifico** (The Pacifico Project Authors). Everything else uses system fonts.
 
 ### Screenshots
 

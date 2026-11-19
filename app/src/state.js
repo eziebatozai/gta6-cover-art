@@ -1,7 +1,10 @@
-// The cover's editable state: photos with crops, panel assignment, layout, size, look and
-// lettering. The renderer reads this object and nothing else, so every control just edits it.
+// The cover's editable state: the panel list (each with its fill, look, locator label and
+// crop), the user's photos, layout, size, seed and caption text. The renderer reads this
+// object and nothing else, so every control just edits it and re-renders.
 
 import { layoutPanels } from './collage-layout.js';
+import { PLATES, ART_PLATE, plateByKey } from './plates.js';
+import { makeRng, shuffled, between } from './rng.js';
 
 export const SIZES = {
   '1080x1080': { w: 1080, h: 1080 },
@@ -9,83 +12,141 @@ export const SIZES = {
   '1920x1080': { w: 1920, h: 1080 },
 };
 
-export const LAYOUTS = ['poster-grid', 'triptych', 'hero'];
+export const LAYOUTS = ['collage', 'poster-grid', 'triptych'];
 
 export const LOOKS = ['sunset', 'neon', 'vice', 'heat', 'noir'];
 
-export const MAX_PHOTOS = 8;
-
 export const DEFAULT_TEXT = {
   headline: 'VICE CITY HEIST',
-  tagline: 'ONE NIGHT. TWO KEYS. NO MERCY.',
-  credit: 'VICE FORGE \u00b7 ISSUE 01 \u00b7 2026',
+  script: 'one night in paradise',
+  quote: 'A FEVER DREAM IN NEON',
+  cite: 'THE COAST HERALD',
+  chips: 'VOL. 06, COLLECTOR\u2019S EDITION',
+  credit: 'VICE FORGE \u00b7 SHOT ON 35MM \u00b7 DEVELOPED IN THE DARK',
 };
 
-/** A fresh state with no photos. */
+/** A fresh state: six panels of the collage, plates dealt from the seed, art panel on. */
 export function makeState() {
-  return {
-    layout: 'poster-grid',
+  const state = {
+    layout: 'collage',
     size: '1080x1080',
     look: 'vice',
-    seed: 0x5eed1a6,
+    seed: 7,
     artPanel: true,
+    stars: true,
     headline: DEFAULT_TEXT.headline,
-    tagline: DEFAULT_TEXT.tagline,
+    script: DEFAULT_TEXT.script,
+    quote: DEFAULT_TEXT.quote,
+    cite: DEFAULT_TEXT.cite,
+    chips: DEFAULT_TEXT.chips,
     credit: DEFAULT_TEXT.credit,
-    photos: [], // { id, name, img, crop: { cx, cy, zoom } }
-    fills: [], // per panel index: photo id | 'art' | 'color'
+    photos: [], // { id, name, img } — the person's own photos, never uploaded
+    panels: [], // per panel: { fill, look, label: {name, sub}, crop: {cx, cy, zoom} }
     selectedPanel: -1,
   };
+  rebuildPanels(state);
+  return state;
 }
 
 let nextPhotoId = 1;
 
-/** Wraps a loaded image in a photo record with a centred cover crop. */
+/** Wraps a loaded image in a photo record. */
 export function makePhoto(img, name) {
   return {
-    id: `p${nextPhotoId++}`,
+    id: `photo:${nextPhotoId++}`,
     name,
     img,
-    crop: { cx: 0.5, cy: 0.45, zoom: 1.12 },
   };
 }
 
-/** Rebuilds the default panel fills for the current layout: photos in order, art panel in its slot. */
-export function refillFills(state, panelCount, artSlot) {
-  const fills = new Array(panelCount).fill('color');
-  if (state.artPanel && artSlot >= 0) fills[artSlot] = 'art';
-  let i = 0;
-  for (let p = 0; p < panelCount; p++) {
-    if (fills[p] !== 'art' && state.photos.length) {
-      fills[p] = state.photos[i % state.photos.length].id;
-      i++;
-    }
-  }
-  state.fills = fills;
+function panelCountOf(state) {
+  const { w, h } = SIZES[state.size] ?? SIZES['1080x1080'];
+  return layoutPanels(state.layout, w / h).length;
+}
+
+/** A believable default crop for a panel: around the plate's focus, a slight punch-in. */
+function seededCrop(rng, plate) {
+  const fx = plate?.focus?.[0] ?? 0.5;
+  const fy = plate?.focus?.[1] ?? 0.44;
+  return {
+    cx: Math.min(0.62, Math.max(0.38, fx + between(rng, -0.03, 0.03))),
+    cy: Math.min(0.66, Math.max(0.34, fy + between(rng, -0.025, 0.025))),
+    zoom: between(rng, 1.06, 1.26),
+  };
 }
 
 /**
- * Re-assigns fills after a layout or photo change, keeping every choice that still means
- * something (art stays art, loaded photos stay put) and giving the rest a photo in order.
+ * Per-panel colour looks: a shuffled deck of the five looks dealt round-robin, swapping any
+ * repeat that would sit right next to its twin, so neighbouring panels always differ strongly.
  */
-export function reassignFills(state, panelCount, artSlot) {
-  const keep = state.photos.map((p) => p.id);
-  const old = state.fills ?? [];
-  const fills = new Array(panelCount).fill('color');
-  if (state.artPanel && artSlot >= 0 && artSlot < panelCount) fills[artSlot] = 'art';
-  let next = 0;
-  for (let p = 0; p < panelCount; p++) {
-    if (fills[p] === 'art') continue;
-    const prev = old[p];
-    if (keep.includes(prev)) fills[p] = prev;
-    else if (state.photos.length) fills[p] = state.photos[next++ % state.photos.length].id;
+function assignLooks(rng, n) {
+  const deck = shuffled(rng, LOOKS);
+  const looks = [];
+  for (let i = 0; i < n; i++) {
+    let look = deck[i % deck.length];
+    if (i > 0 && look === looks[i - 1]) {
+      const j = (i % deck.length + 1) % deck.length;
+      look = deck[j];
+    }
+    looks.push(look);
   }
-  state.fills = fills;
+  // The hero panel carries the poster's key light: warm sunset two times in three.
+  if (n > 0 && rng() < 0.72) looks[0] = rng() < 0.55 ? 'sunset' : 'heat';
+  return looks;
 }
 
-/** The art panel's slot for a layout at the current aspect. */
-export function artSlotFor(layoutName, aspect) {
-  return layoutPanels(layoutName, aspect).artSlot;
+/**
+ * Rebuilds the whole panel list from the seed: the hero takes the first user photo when there
+ * is one (the poster is the person's photo first), otherwise the IN THE CAR plate; the rest of
+ * the mosaic is a seeded shuffle of plates, with the drawn art panel in the last slot when it
+ * is switched on. Locator labels default to their plate's name and time line.
+ */
+export function rebuildPanels(state) {
+  const n = panelCountOf(state);
+  const rng = makeRng(state.seed ^ 0x5eed1);
+  const plates = shuffled(rng, PLATES.map((p) => p.key));
+  const pool = [...state.photos.map((p) => p.id), ...plates];
+
+  const fills = new Array(n).fill('wash');
+  const used = new Set();
+  // Hero: the person's photo if there is one, else the plate that started the series.
+  const heroDefault = state.photos.length ? state.photos[0].id : 'car';
+  fills[0] = heroDefault;
+  used.add(heroDefault);
+
+  let pi = 0;
+  for (let i = 1; i < n; i++) {
+    while (pi < pool.length && used.has(pool[pi])) pi++;
+    if (pi >= pool.length) break;
+    fills[i] = pool[pi];
+    used.add(pool[pi]);
+    pi++;
+  }
+  if (state.artPanel && n > 1) fills[n - 1] = 'art';
+
+  const looks = assignLooks(rng, n);
+  state.panels = fills.map((fill, i) => {
+    const plate = plateByKey(fill.replace(/^plate:/, ''));
+    return {
+      fill,
+      look: looks[i],
+      label: { name: plate ? plate.name : 'VICE SUNSET', sub: plate ? plate.time : ART_PLATE.time },
+      crop: seededCrop(rng, plate),
+    };
+  });
+  if (state.selectedPanel >= n) state.selectedPanel = -1;
+}
+
+/** Reshuffle: a new seed re-deals the plates, the looks and the label detail lines. */
+export function reshuffle(state) {
+  state.seed = (Date.now() ^ Math.floor(performance.now() * 1000)) >>> 0;
+  rebuildPanels(state);
+}
+
+/** The photo object behind a panel's fill id ('photo:N'), or null. */
+export function photoForFill(state, fill) {
+  if (typeof fill !== 'string' || !fill.startsWith('photo:')) return null;
+  return state.photos.find((p) => p.id === fill) ?? null;
 }
 
 /** Clamps a crop so its photo always covers the panel (no white edges from panning). */

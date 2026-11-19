@@ -1,13 +1,14 @@
 // Crop transforms: where a photo sits inside a panel. The crop is a centre (cx, cy in image
 // units 0..1) plus a zoom (1 = cover fit). The renderer derives a cover source rect from it,
-// honouring the pan and zoom, and clips the drawing to the panel.
+// honouring the pan and zoom, and clips the drawing to the panel. Crops live on each panel in
+// state.panels; these helpers work on any crop object, so the same maths drives drag, wheel
+// and keyboard editing.
 
 /**
- * The source rect (in image pixels) that covers a panel of aspect pw/ph for a photo crop:
- * an object of image-space source rect plus the panel-space destination, so
+ * The source rect (in image pixels) that covers a panel of aspect pw/ph for a photo crop, so
  * `drawImage(img, sx, sy, sw, sh, dx, dy, dw, dh)` fills the panel exactly.
  */
-export function cropToDraw(img, crop, px, py, pw, ph) {
+export function cropToDraw(img, crop, pw, ph) {
   const iw = img.naturalWidth || img.width;
   const ih = img.naturalHeight || img.height;
   const panelAspect = pw / ph;
@@ -28,8 +29,7 @@ export function cropToDraw(img, crop, px, py, pw, ph) {
   sw /= z;
   sh /= z;
 
-  // Pan: the crop centre (0..1 in image units) minus 0.5, in pixels, clamped so the window
-  // stays inside the image.
+  // Pan: the crop centre (0..1 in image units), clamped so the window stays inside the image.
   const overX = Math.max(0, (iw - sw) / 2);
   const overY = Math.max(0, (ih - sh) / 2);
   const cx = ((crop.cx ?? 0.5) - 0.5) * iw;
@@ -37,8 +37,6 @@ export function cropToDraw(img, crop, px, py, pw, ph) {
   const sx = Math.min(overX, Math.max(-overX, cx)) + (iw - sw) / 2;
   const sy = Math.min(overY, Math.max(-overY, cy)) + (ih - sh) / 2;
 
-  void px;
-  void py;
   return { sx, sy, sw, sh };
 }
 
@@ -58,7 +56,7 @@ export function panCrop(crop, dxPanel, dyPanel, panelAspect, img) {
 
 /**
  * Zooms a crop around the panel anchor (fx, fy in panel units 0..1), keeping that image point
- * still under the cursor. State.clampCrop then bounds the result.
+ * still under the cursor. clampCrop then bounds the result.
  */
 export function zoomCrop(crop, factor, img, panelAspect, fx = 0.5, fy = 0.5) {
   const iw = img.naturalWidth || img.width;
@@ -91,6 +89,6 @@ export function autoFrame(crop) {
   return {
     cx: 0.5 + ((crop.cx ?? 0.5) - 0.5) * 0.4,
     cy: 0.46,
-    zoom: Math.max(1.12, crop.zoom ?? 1),
+    zoom: Math.max(1.14, crop.zoom ?? 1),
   };
 }

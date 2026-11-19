@@ -1,7 +1,8 @@
-// The art panel: a 1980s Miami sunset scene drawn entirely with canvas 2D paths and gradients.
-// Layered gradient sky, a big slatted sun with glow, a seeded skyline with lit windows, water
-// with a sun reflection, palm silhouettes, birds, stars and sparkles. Every hue comes from the
-// active look's palette, and every random choice from the cover's seed, so it is reproducible.
+// The art panel: a 1980s Miami sunset scene drawn entirely with canvas 2D paths and gradients —
+// the optional "VICE SUNSET" plate among the photographic ones. Layered gradient sky, a big
+// slatted sun with glow, a seeded skyline with lit windows, water with a mirrored-sky
+// reflection, palm silhouettes, birds, stars and sparkles. Every hue comes from the active
+// look's palette, and every random choice from the cover's seed, so it is reproducible.
 
 import { makeRng } from './rng.js';
 
@@ -102,8 +103,8 @@ export function drawArtPanel(ctx, x, y, w, h, lookName, seed) {
   drawClouds(ctx, w, horizon, p, rng);
   drawBirds(ctx, w, horizon, rng, p);
   drawSkyline(ctx, w, horizon, h, p, rng, true);
-  drawSun(ctx, sunX, horizon, sunR, w, h, p);
-  drawWater(ctx, w, horizon, h, p);
+  drawSun(ctx, sunX, horizon, sunR, p);
+  drawWater(ctx, w, horizon, h, p, rng, x, y);
   drawSunReflection(ctx, sunX, horizon, sunR, h, p, rng);
   drawSkyline(ctx, w, horizon, h, p, rng, false);
   drawPalms(ctx, w, h, horizon, p, rng);
@@ -121,8 +122,7 @@ function drawSky(ctx, w, horizon, p, rng) {
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, w, horizon);
 
-  // Poster bands: a few soft horizontal divisions, higher near the horizon.
-  ctx.globalAlpha = 0.10;
+  ctx.globalAlpha = 0.1;
   const bands = 4;
   for (let i = 1; i <= bands; i++) {
     const by = horizon * (i / (bands + 1)) + horizon * 0.04 * rng();
@@ -132,7 +132,7 @@ function drawSky(ctx, w, horizon, p, rng) {
   ctx.globalAlpha = 1;
 }
 
-/** Seeded stars in the upper sky: bright dots plus a couple of tiny crosses. */
+/** Seeded stars in the upper sky: bright dots. */
 function drawStars(ctx, w, horizon, p, rng) {
   const count = Math.round((w * horizon) / 16000);
   ctx.fillStyle = p.star;
@@ -149,10 +149,9 @@ function drawStars(ctx, w, horizon, p, rng) {
 }
 
 /** The big sun: glow, gradient disc, then slats cut by repainting the sky gradient. */
-function drawSun(ctx, sunX, horizon, sunR, w, h, p) {
+function drawSun(ctx, sunX, horizon, sunR, p) {
   const cy = horizon - sunR * 0.62;
 
-  // Outer glow.
   const glowR = sunR * 2.6;
   const glow = ctx.createRadialGradient(sunX, cy, sunR * 0.4, sunX, cy, glowR);
   glow.addColorStop(0, `${p.glow}0.5)`);
@@ -161,7 +160,6 @@ function drawSun(ctx, sunX, horizon, sunR, w, h, p) {
   ctx.fillStyle = glow;
   ctx.fillRect(sunX - glowR, cy - glowR, glowR * 2, glowR * 2);
 
-  // Disc.
   const disc = ctx.createLinearGradient(0, cy - sunR, 0, cy + sunR);
   disc.addColorStop(0, p.sunTop);
   disc.addColorStop(0.55, p.sunMid);
@@ -173,7 +171,6 @@ function drawSun(ctx, sunX, horizon, sunR, w, h, p) {
   ctx.fillStyle = disc;
   ctx.fillRect(sunX - sunR, cy - sunR, sunR * 2, sunR * 2);
 
-  // Slats: horizontal gaps in the lower half, widening downward, poster style.
   const slats = 5;
   let gap = sunR * 0.055;
   let yy = cy + sunR * 0.08;
@@ -198,7 +195,6 @@ function drawSkyline(ctx, w, horizon, h, p, rng, far) {
     const bw = w * (0.03 + rng() * 0.075);
     const bh = layerH * (0.3 + rng() * 0.75);
     ctx.fillRect(bx, baseY - bh, bw, bh); // buildings stop at the horizon; the water runs in front
-    // Windows on the nearer layer only, sparse and warm.
     if (!far && bh > layerH * 0.5 && rng() < 0.8) {
       const cols = Math.max(1, Math.floor(bw / (w * 0.012)));
       const rows = Math.max(1, Math.floor(bh / (h * 0.02)));
@@ -219,7 +215,7 @@ function drawSkyline(ctx, w, horizon, h, p, rng, far) {
 }
 
 /** Water: dark gradient with faint horizon shimmer lines. */
-function drawWater(ctx, w, horizon, h, p) {
+function drawWater(ctx, w, horizon, h, p, rng, x, y) {
   const g = ctx.createLinearGradient(0, horizon, 0, h);
   g.addColorStop(0, p.water[0]);
   g.addColorStop(0.4, p.water[1]);
@@ -227,7 +223,27 @@ function drawWater(ctx, w, horizon, h, p) {
   ctx.fillStyle = g;
   ctx.fillRect(0, horizon, w, h - horizon);
 
-  // Horizon line: a bright kiss where sky meets sea.
+  // Mirrored sky: a wobbling, fading copy of the sky band just above the horizon, drawn as
+  // horizontal slices so it reads as water catching the last light.
+  const depth = Math.min(h - horizon, horizon * 0.5);
+  const slices = 14;
+  const scratch = document.createElement('canvas');
+  scratch.width = Math.max(2, Math.round(w));
+  scratch.height = Math.max(2, Math.round(depth));
+  const sctx = scratch.getContext('2d');
+  sctx.drawImage(ctx.canvas, x, y + horizon - depth, w, depth, 0, 0, w, depth);
+  ctx.save();
+  ctx.globalAlpha = 0.3;
+  for (let i = 0; i < slices; i++) {
+    const t = i / slices;
+    const sy = depth * (1 - t) - depth / slices;
+    const dy = horizon + t * depth;
+    const sh = depth / slices;
+    const dx = (rng() - 0.5) * w * 0.02 * (1 + t * 3);
+    ctx.drawImage(scratch, 0, Math.max(0, sy), w, sh, dx, dy, w, sh * (0.5 + rng() * 0.5));
+  }
+  ctx.restore();
+
   ctx.fillStyle = `${p.wave}0.35)`;
   ctx.fillRect(0, horizon, w, Math.max(1, h * 0.003));
 }
@@ -286,7 +302,6 @@ function drawPalm(ctx, baseX, baseY, height, lean, rng, p) {
   const topX = baseX + lean * height;
   const topY = baseY - height;
 
-  // Trunk: sample a quadratic curve, offset by a tapering width.
   const segs = 9;
   const w0 = height * 0.045;
   const w1 = height * 0.016;
@@ -309,13 +324,11 @@ function drawPalm(ctx, baseX, baseY, height, lean, rng, p) {
   ctx.closePath();
   ctx.fill();
 
-  // Crown.
   const fronds = 8;
   const L = height * (0.36 + rng() * 0.08);
   for (let i = 0; i < fronds; i++) {
-    // Fronds fan from near-vertical round to hanging, with a droop at the tips.
-    const t = i / (fronds - 1); // 0..1
-    const up = Math.PI * (0.08 + t * 1.15); // angle above horizontal, from left to right
+    const t = i / (fronds - 1);
+    const up = Math.PI * (0.08 + t * 1.15);
     const dir = t < 0.5 ? -1 : 1;
     const spread = dir < 0 ? up : Math.PI * 1.92 - up;
     const droop = 0.25 + rng() * 0.35;
@@ -331,7 +344,6 @@ function drawPalm(ctx, baseX, baseY, height, lean, rng, p) {
     ctx.fill();
   }
 
-  // Coconuts.
   const nuts = 2 + Math.floor(rng() * 2);
   for (let i = 0; i < nuts; i++) {
     ctx.beginPath();
@@ -340,7 +352,7 @@ function drawPalm(ctx, baseX, baseY, height, lean, rng, p) {
   }
 }
 
-/** A few birds as thin twin arcs, high in the sky and few enough to read as birds. */
+/** A few birds as thin twin arcs, high in the sky. */
 function drawBirds(ctx, w, horizon, rng, p) {
   const count = 2 + Math.floor(rng() * 2);
   ctx.strokeStyle = p.silhouette;
@@ -360,7 +372,7 @@ function drawBirds(ctx, w, horizon, rng, p) {
   ctx.globalAlpha = 1;
 }
 
-/** Poster sparkles: four-point glints on the water and near the sun. */
+/** Poster sparkles: four-point glints on the water. */
 function drawSparkles(ctx, w, h, horizon, p, rng) {
   const count = 3 + Math.floor(rng() * 3);
   ctx.fillStyle = p.sparkle;

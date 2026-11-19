@@ -1,6 +1,7 @@
-// Loading images: files from the person's machine (never uploaded) or the bundled samples.
+// Loading images: files from the person's machine (read with the File API, never uploaded)
+// and the bundled scene plates, which are plain files under ./samples.
 
-/** Loads an image from any URL the page can reach locally, resolving when it can be drawn. */
+/** Loads an image from an app-relative or blob URL, resolving when it can be drawn. */
 export function loadImage(url) {
   return new Promise((resolve, reject) => {
     const img = new Image();

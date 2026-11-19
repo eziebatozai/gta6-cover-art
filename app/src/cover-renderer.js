@@ -1,18 +1,21 @@
-// The cover renderer: assembles the whole poster on a canvas at the chosen export size.
-// White poster margin, the layout's panel collage (photos through their crops and grade, or
-// the drawn art panel), light-leak chrome, then the caption block and credit strip. Also
-// returns the panel rectangles so the editor can hit-test and select panels.
+// The cover renderer: assembles the whole poster on one canvas at the exact export size.
+// Cream poster stock, a thin dark keyline around the panel region, the layout's panel collage
+// (each panel its own colour grade over its photo or plate, plus a locator label), the drawn
+// art panel where chosen, the caption band and the credit strip. Also returns the panel
+// rectangles in canvas coordinates so the editor can hit-test and select panels.
 
 import { layoutPanels } from './collage-layout.js';
 import { cropToDraw } from './crop-transform.js';
-import { gradePhoto, LOOK_DEFS } from './color-grade.js';
+import { gradePhoto, lookDef } from './color-grade.js';
 import { drawArtPanel } from './art-panel.js';
-import { drawBadge, drawHeadline, drawTagline, drawCreditStrip, letterPalette } from './lettering.js';
-import { SIZES, clampCrop } from './state.js';
-import { makeRng } from './rng.js';
+import { plateImage, plateByKey } from './plates.js';
+import { drawLocatorLabel } from './labels.js';
+import { captionGeometry, drawCaptionBand, drawCreditStrip } from './caption-band.js';
+import { letterPalette, POSTER_CREAM } from './lettering.js';
+import { SIZES, photoForFill, clampCrop } from './state.js';
+import { makeRng, between } from './rng.js';
 
-const POSTER_WHITE = '#faf7f1';
-const PANEL_EDGE = '#180d26';
+const PANEL_EDGE = '#160d20';
 
 /**
  * Renders the cover for `state` onto `canvas`, resizing it to the chosen export size first.
@@ -24,102 +27,120 @@ export function renderCover(canvas, state, opts = {}) {
   if (canvas.width !== W) canvas.width = W;
   if (canvas.height !== H) canvas.height = H;
   const ctx = canvas.getContext('2d');
+  const minWH = Math.min(W, H);
 
-  const rng = makeRng(state.seed);
-  const pal = letterPalette(state.look);
+  const rng = makeRng(state.seed ^ 0xa17);
+  const pal = letterPalette(state.look ?? 'vice');
 
   ctx.save();
   ctx.globalCompositeOperation = 'source-over';
   ctx.globalAlpha = 1;
-  ctx.fillStyle = POSTER_WHITE;
+  ctx.fillStyle = POSTER_CREAM;
   ctx.fillRect(0, 0, W, H);
 
-  // Vertical rhythm: top margin, panels, caption block, then the full-bleed credit strip.
-  const M = Math.round(Math.min(W, H) * 0.03);
-  const creditH = drawCreditStrip(ctx, W, H, state.credit, state.look);
-  const capH = Math.round(Math.min(W, H) * 0.17);
-  const panelsX = M;
-  const panelsY = M;
-  const panelsW = W - M * 2;
-  const panelsH = H - M - capH - creditH;
+  // Vertical rhythm: top margin, panels, caption band, full-bleed credit strip.
+  const { bandH, creditH } = captionGeometry(W, H);
+  const margin = Math.round(minWH * 0.026);
+  const gutter = Math.max(8, Math.min(14, Math.round(W * 0.0068)));
+  const panelsX = margin;
+  const panelsY = margin;
+  const panelsW = W - margin * 2;
+  const panelsH = H - margin - bandH - creditH;
+  const regionAspect = panelsW / panelsH;
 
-  const layout = layoutPanels(state.layout, panelsW / panelsH);
-  const gutter = Math.max(3, Math.round(Math.min(W, H) * 0.014));
-  const rects = layout.panels.map((p) => ({
+  const base = layoutPanels(state.layout, regionAspect);
+  const rects = base.map((p) => ({
     x: panelsX + p.x * panelsW + gutter / 2,
     y: panelsY + p.y * panelsH + gutter / 2,
     w: p.w * panelsW - gutter,
     h: p.h * panelsH - gutter,
   }));
 
-  // Panels first: dark bases, then content, then dark inner borders.
+  // A thin keyline around the whole collage, like a print margin rule.
+  ctx.strokeStyle = 'rgba(22,13,32,0.9)';
+  ctx.lineWidth = Math.max(2, Math.round(minWH * 0.0035));
+  ctx.strokeRect(panelsX - ctx.lineWidth / 2, panelsY - ctx.lineWidth / 2, panelsW + ctx.lineWidth, panelsH + ctx.lineWidth);
+
+  state.panels = state.panels && state.panels.length === rects.length
+    ? state.panels
+    : state.panels.concat(new Array(Math.max(0, rects.length - state.panels.length)).fill(null));
+
+  // Panels: dark bases, then content (graded photo / art / wash), then the dark inner border.
   ctx.fillStyle = PANEL_EDGE;
   for (const r of rects) ctx.fillRect(r.x - 1, r.y - 1, r.w + 2, r.h + 2);
 
-  state.fills = state.fills && state.fills.length === rects.length ? state.fills : new Array(rects.length).fill('color');
   rects.forEach((r, i) => {
-    const fill = state.fills[i] ?? 'color';
+    const panel = state.panels[i] ?? { fill: 'wash', look: 'vice', label: null, crop: { cx: 0.5, cy: 0.5, zoom: 1.1 } };
     ctx.save();
     ctx.beginPath();
     ctx.rect(r.x, r.y, r.w, r.h);
     ctx.clip();
-    if (fill === 'art') {
-      drawArtPanel(ctx, r.x, r.y, r.w, r.h, state.look, state.seed + i * 97);
-    } else {
-      const photo = state.photos.find((ph) => ph.id === fill);
-      if (photo) {
-        const crop = clampCrop(photo.crop);
-        const src = cropToDraw(photo.img, crop, r.x, r.y, r.w, r.h);
-        const graded = gradePhoto(photo.img, src, r.w, r.h, state.look, state.seed + i * 131);
-        ctx.drawImage(graded, r.x, r.y, r.w, r.h);
-      } else {
-        drawEmptyPanel(ctx, r, state.look, i);
-      }
-      // Tiny corner chip: the panel's index, like a contact-sheet print.
-      drawPanelChip(ctx, r, i);
+
+    let drew = false;
+    const img = imageForFill(state, panel.fill);
+    if (panel.fill === 'art') {
+      drawArtPanel(ctx, r.x, r.y, r.w, r.h, panel.look, state.seed + i * 97);
+      drew = true;
+    } else if (img) {
+      const src = cropToDraw(img, clampCrop(panel.crop), r.w, r.h);
+      const graded = gradePhoto(img, src, r.w, r.h, panel.look, state.seed + i * 131);
+      ctx.drawImage(graded, r.x, r.y, r.w, r.h);
+      drew = true;
     }
+    if (!drew) drawWashPanel(ctx, r, panel.look);
+
+    drawLocatorLabel(ctx, r, panel.label);
     ctx.restore();
+
     // Dark border inside the white gutter.
+    const bw = Math.max(2, Math.round(minWH * 0.0032));
     ctx.strokeStyle = PANEL_EDGE;
-    ctx.lineWidth = Math.max(2, Math.round(Math.min(W, H) * 0.004));
-    ctx.strokeRect(r.x + ctx.lineWidth / 2, r.y + ctx.lineWidth / 2, r.w - ctx.lineWidth, r.h - ctx.lineWidth);
+    ctx.lineWidth = bw;
+    ctx.strokeRect(r.x + bw / 2, r.y + bw / 2, r.w - bw, r.h - bw);
   });
 
   // Chrome: light-leak streaks and a whisper of grain over the panel region only.
   drawLightLeaks(ctx, panelsX, panelsY, panelsW, panelsH, pal, rng);
   drawChromeGrain(ctx, panelsX, panelsY, panelsW, panelsH);
 
-  // Caption block: badge, arched headline, tagline — each fitted inside its slice of the zone.
-  const capY = panelsY + panelsH;
-  drawBadge(ctx, 'ISSUE 01 \u00b7 2026', W / 2, capY + capH * 0.085, capH * 0.14, state.look);
-  drawHeadline(ctx, state.headline, W / 2, capY + capH * 0.23, panelsW * 0.92, capH * 0.55, state.look);
-  drawTagline(ctx, state.tagline, W / 2, capY + capH * 0.865, panelsW * 0.88, state.look, capH * 0.105);
+  // Caption band + credit strip.
+  const bandY = panelsY + panelsH;
+  drawCaptionBand(ctx, 0, bandY, W, bandH, state, pal);
+  drawCreditStrip(ctx, W, H, state.credit, pal);
 
   // Editor selection outline.
   if (opts.showSelection && state.selectedPanel >= 0 && state.selectedPanel < rects.length) {
     const s = rects[state.selectedPanel];
     ctx.save();
-    ctx.strokeStyle = '#22d3ee';
-    ctx.lineWidth = Math.max(3, Math.round(Math.min(W, H) * 0.008));
-    ctx.setLineDash([Math.min(W, H) * 0.03, Math.min(W, H) * 0.02]);
-    ctx.strokeRect(s.x, s.y, s.w, s.h);
+    ctx.strokeStyle = '#3ee6ff';
+    ctx.lineWidth = Math.max(3, Math.round(minWH * 0.007));
+    ctx.setLineDash([minWH * 0.028, minWH * 0.018]);
+    ctx.strokeRect(s.x - ctx.lineWidth, s.y - ctx.lineWidth, s.w + ctx.lineWidth * 2, s.h + ctx.lineWidth * 2);
     ctx.restore();
   }
 
   ctx.restore();
-  return { rects, creditH };
+  return { rects };
+}
+
+/** The image a panel's fill points at: a plate or one of the person's photos. */
+function imageForFill(state, fill) {
+  if (typeof fill !== 'string') return null;
+  if (fill.startsWith('photo:')) return photoForFill(state, fill)?.img ?? null;
+  const plate = plateByKey(fill);
+  return plate ? plateImage(plate.key) : null;
 }
 
 /** A panel with no photo: a graded duotone wash with poster stripes, intentional-looking. */
-function drawEmptyPanel(ctx, r, lookName, index) {
-  const def = LOOK_DEFS[lookName] ?? LOOK_DEFS.vice;
+function drawWashPanel(ctx, r, lookName) {
+  const def = lookDef(lookName);
   const g = ctx.createLinearGradient(r.x, r.y, r.x + r.w, r.y + r.h);
   g.addColorStop(0, def.map[0]);
   g.addColorStop(0.6, def.map[1]);
   g.addColorStop(1, def.map[2]);
   ctx.fillStyle = g;
   ctx.fillRect(r.x, r.y, r.w, r.h);
-  ctx.globalAlpha = 0.16;
+  ctx.globalAlpha = 0.14;
   ctx.fillStyle = def.map[2];
   const n = 6;
   for (let i = -r.h; i < r.w; i += (r.w + r.h) / n) {
@@ -134,24 +155,6 @@ function drawEmptyPanel(ctx, r, lookName, index) {
   ctx.globalAlpha = 1;
 }
 
-/** Small index chip in a panel's top-left corner. */
-function drawPanelChip(ctx, r, index) {
-  const size = Math.max(9, Math.min(r.w, r.h) * 0.055);
-  const pad = size * 0.4;
-  ctx.save();
-  ctx.globalAlpha = 0.75;
-  ctx.fillStyle = '#160a24';
-  ctx.beginPath();
-  ctx.roundRect(r.x + pad, r.y + pad, size * 1.7, size * 1.15, size * 0.25);
-  ctx.fill();
-  ctx.fillStyle = 'rgba(255,255,255,0.9)';
-  ctx.font = `${size * 0.8}px "Bebas Neue"`;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(String(index + 1).padStart(2, '0'), r.x + pad + size * 0.85, r.y + pad + size * 0.62);
-  ctx.restore();
-}
-
 /** Diagonal light-leak streaks across the panel region, screen-blended. */
 function drawLightLeaks(ctx, x, y, w, h, pal, rng) {
   ctx.save();
@@ -159,19 +162,18 @@ function drawLightLeaks(ctx, x, y, w, h, pal, rng) {
   ctx.rect(x, y, w, h);
   ctx.clip();
   ctx.globalCompositeOperation = 'screen';
-  const streaks = 2;
-  for (let i = 0; i < streaks; i++) {
+  for (let i = 0; i < 2; i++) {
     const cx = x + w * rng();
     const cy = y + h * rng();
-    const len = Math.max(w, h) * (0.9 + rng() * 0.6);
-    const wid = Math.max(w, h) * (0.1 + rng() * 0.08);
+    const len = Math.max(w, h) * between(rng, 0.9, 1.5);
+    const wid = Math.max(w, h) * between(rng, 0.08, 0.16);
     const ang = (rng() - 0.5) * 1.2 + (i === 0 ? -0.7 : 0.5);
     ctx.save();
     ctx.translate(cx, cy);
     ctx.rotate(ang);
     const g = ctx.createLinearGradient(-len / 2, 0, len / 2, 0);
     g.addColorStop(0, 'rgba(255,255,255,0)');
-    g.addColorStop(0.5, hexWithAlpha(pal.mid, 0.06 + rng() * 0.05));
+    g.addColorStop(0.5, hexWithAlpha(pal.accent, 0.05 + rng() * 0.05));
     g.addColorStop(1, 'rgba(255,255,255,0)');
     ctx.fillStyle = g;
     ctx.fillRect(-len / 2, -wid / 2, len, wid);

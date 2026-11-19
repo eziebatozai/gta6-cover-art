@@ -1,15 +1,13 @@
 // Screenshot driver: serves app/ on a free port, opens each recipe from shots.json in headless
 // Chromium (Playwright), waits for window.__shotReady, and writes the JPEGs into screenshots/.
-// It also verifies the export path: in the editor shot it clicks Export and checks the
-// downloaded PNG's dimensions match the chosen size. Usage:
-//   node tools/shots.mjs            write the three screenshots
-//   node tools/shots.mjs --exports  run the export download test (three sizes)
+// `node tools/shots.mjs --exports` additionally verifies the export path: in the editor it
+// clicks Export for all three sizes and checks each downloaded PNG's IHDR dimensions.
 
 import { createServer } from 'node:http';
 import { extname, join } from 'node:path';
 import { readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { readFileSync, writeFileSync, mkdirSync, existsSync, statSync } from 'node:fs';
+import { readFileSync, mkdirSync, existsSync, statSync } from 'node:fs';
 
 const here = fileURLToPath(new URL('..', import.meta.url));
 const appRoot = join(here, 'app');
@@ -54,7 +52,7 @@ const MIME = {
   '.jpeg': 'image/jpeg',
   '.png': 'image/png',
   '.ttf': 'font/ttf',
-  '.txt': 'text/plain; charset=utf-8',
+  '.md': 'text/markdown; charset=utf-8',
 };
 
 const server = createServer((req, res) => {
@@ -78,7 +76,7 @@ const browser = await chromium.launch();
 async function open(query, width, height) {
   const page = await browser.newPage({ viewport: { width, height }, deviceScaleFactor: 1 });
   await page.goto(`http://127.0.0.1:${port}/${query}`, { waitUntil: 'load' });
-  await page.waitForFunction(() => window.__shotReady === true, null, { timeout: 20000 });
+  await page.waitForFunction(() => window.__shotReady === true, null, { timeout: 30000 });
   return page;
 }
 
@@ -87,10 +85,10 @@ if (process.argv.includes('--exports')) {
   for (const size of ['1080x1080', '1080x1350', '1920x1080']) {
     const [w, h] = size.split('x').map(Number);
     const page = await browser.newPage({ viewport: { width: 1400, height: 900 } });
-    await page.goto(`http://127.0.0.1:${port}/?shot=editor&size=${size}&photo=samples/pier.jpg&caption=Export%20Test`, { waitUntil: 'load' });
-    await page.waitForFunction(() => window.__shotReady === true, null, { timeout: 20000 });
+    await page.goto(`http://127.0.0.1:${port}/?shot=editor&size=${size}&photo=samples/boulevard.jpg&headline=Export%20Test`, { waitUntil: 'load' });
+    await page.waitForFunction(() => window.__shotReady === true, null, { timeout: 30000 });
     const [download] = await Promise.all([
-      page.waitForEvent('download', { timeout: 20000 }),
+      page.waitForEvent('download', { timeout: 30000 }),
       page.click('#export'),
     ]);
     const tmp = `/tmp/vice-forge-export-${size}.png`;
@@ -108,7 +106,7 @@ if (process.argv.includes('--exports')) {
   for (const r of recipes) {
     const page = await open(r.query, r.w, r.h);
     const out = join(outDir, r.name);
-    await page.screenshot({ path: out, type: 'jpeg', quality: 88 });
+    await page.screenshot({ path: out, type: 'jpeg', quality: r.quality ?? 88 });
     const bytes = statSync(out).size;
     console.log(`${r.name}: ${r.w}x${r.h}, ${(bytes / 1024).toFixed(0)} KiB`);
     await page.close();

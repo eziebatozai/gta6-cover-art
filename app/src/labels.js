@@ -1,0 +1,65 @@
+// Locator labels: every panel carries a small caption bar — a dark translucent strip along the
+// panel's bottom edge with a bold caps name and a smaller detail line under it, like a contact
+// sheet's margin notes. Defaults are seeded per panel; the inspector edits both lines.
+
+export function makeLabel(name, sub) {
+  return { name, sub };
+}
+
+/** Draws the locator bar inside panel rect r. Never drawn above r (it hugs the bottom edge). */
+export function drawLocatorLabel(ctx, r, label) {
+  if (!label || !label.name) return;
+  const barH = Math.max(20, Math.min(r.h * 0.26, Math.max(30, r.h * 0.155)));
+  const padX = Math.max(8, barH * 0.34);
+  const nameSize = Math.max(10, Math.min(barH * 0.5, r.w * 0.09));
+  const subSize = nameSize * 0.62;
+  const textW = (size, text, track) => {
+    ctx.font = `${size}px "Bebas Neue"`;
+    ctx.letterSpacing = `${track}px`;
+    const w = ctx.measureText(text).width;
+    ctx.letterSpacing = '0px';
+    return w;
+  };
+
+  const nameText = String(label.name).toUpperCase().slice(0, 30);
+  const subText = String(label.sub ?? '').toUpperCase().slice(0, 36);
+  const showSub = subText && barH >= 30 && r.h > barH * 1.6;
+  const nameW = textW(nameSize, nameText, nameSize * 0.09);
+  const subW = showSub ? textW(subSize, subText, subSize * 0.22) : 0;
+  const need = padX * 2 + Math.max(nameW, subW);
+
+  // Shrink to fit narrow strips rather than spill over the panel's edge.
+  let scale = 1;
+  if (need > r.w * 0.96) scale = (r.w * 0.96) / need;
+  const nSize = nameSize * scale;
+  const sSize = subSize * scale;
+
+  const y = r.y + r.h - barH;
+  ctx.save();
+  // The bar: a dark translucent gradient, darkest at its left edge.
+  const g = ctx.createLinearGradient(r.x, y, r.x + r.w, y);
+  g.addColorStop(0, 'rgba(12,8,20,0.82)');
+  g.addColorStop(1, 'rgba(12,8,20,0.58)');
+  ctx.fillStyle = g;
+  ctx.fillRect(r.x, y, r.w, barH);
+  // Warm keyline on top of the bar, a print detail.
+  ctx.fillStyle = 'rgba(255,180,110,0.55)';
+  ctx.fillRect(r.x, y, r.w, Math.max(1, barH * 0.035));
+
+  ctx.textBaseline = 'alphabetic';
+  ctx.textAlign = 'left';
+  const baseY = y + barH * (showSub ? 0.48 : 0.62);
+  ctx.font = `${nSize}px "Bebas Neue"`;
+  ctx.letterSpacing = `${nSize * 0.09}px`;
+  ctx.fillStyle = '#f6efdf';
+  ctx.fillText(nameText, r.x + padX, baseY);
+
+  if (showSub) {
+    ctx.font = `${sSize}px "Bebas Neue"`;
+    ctx.letterSpacing = `${sSize * 0.22}px`;
+    ctx.fillStyle = 'rgba(255,205,150,0.92)';
+    ctx.fillText(subText, r.x + padX, baseY + sSize * 1.28);
+  }
+  ctx.letterSpacing = '0px';
+  ctx.restore();
+}

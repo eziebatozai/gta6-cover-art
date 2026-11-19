@@ -9,7 +9,7 @@
 <body>
 <main class="app" id="app">
 
-  <aside class="sidebar" id="sidebar">
+  <aside class="bar bar-left" id="leftbar">
     <header class="brand">
       <div class="brand-mark">
         <span class="brand-vice">VICE</span><span class="brand-forge">FORGE</span>
@@ -18,64 +18,25 @@
     </header>
 
     <section class="panel">
-      <h2>Photos</h2>
-      <div class="row">
-        <button id="addPhotos" type="button" class="btn btn-accent">Add photos</button>
-        <span class="mini" id="photoCount">0 / 8</span>
-      </div>
-      <p class="mini">Or drop images anywhere on the page. Up to 8 photos, each with its own crop.</p>
-      <ul class="photo-strip" id="photoStrip" aria-label="Loaded photos"></ul>
-      <p class="mini" id="photoHint">Add a photo to begin — panels fill in order.</p>
-    </section>
-
-    <section class="panel" id="panelPanel">
-      <h2>Selected panel <span class="mini" id="panelId">—</span></h2>
-      <label class="field">
-        <span>Fill with</span>
-        <select id="panelFill"></select>
-      </label>
-      <div class="row">
-        <button id="autoFrame" type="button" class="btn">Auto-frame</button>
-        <button id="resetCrop" type="button" class="btn">Reset crop</button>
-      </div>
-      <p class="mini">On the preview: click a panel to select it, drag to pan, wheel to zoom.</p>
+      <h2>Scene plates <span class="mini">+ your photos</span></h2>
+      <button id="addPhotos" type="button" class="btn btn-accent btn-block">Add your own photos</button>
+      <p class="mini">Or drop images anywhere. Click a plate to fill the selected panel.</p>
+      <div class="plate-grid" id="plateGrid" aria-label="Scene plates"></div>
     </section>
 
     <section class="panel">
-      <h2>Layout</h2>
+      <h2>Poster</h2>
       <div class="seg" id="layoutSeg" role="group" aria-label="Layout"></div>
-      <h2>Size</h2>
       <div class="seg" id="sizeSeg" role="group" aria-label="Export size"></div>
-      <h2>Colour grade</h2>
-      <div class="looks" id="lookSeg" role="group" aria-label="Colour grade"></div>
-      <label class="check">
-        <input type="checkbox" id="artToggle" checked>
-        <span>Sunset art panel (drawn by code)</span>
-      </label>
-      <div class="row">
-        <button id="reseed" type="button" class="btn" title="New random seed for art & grain">Reseed art &#10227;</button>
+      <div class="looks" id="lookSeg" role="group" aria-label="Poster key light"></div>
+      <div class="row row-quiet">
+        <label class="check">
+          <input type="checkbox" id="artToggle" checked>
+          <span>Vice Sunset art panel</span>
+        </label>
+        <button id="reshuffle" type="button" class="btn btn-mini" title="New seed: re-deal plates, grades &amp; labels">Reshuffle &#10227;</button>
       </div>
-    </section>
-
-    <section class="panel">
-      <h2>Lettering</h2>
-      <label class="field">
-        <span>Headline</span>
-        <input id="headline" type="text" maxlength="26" value="VICE CITY HEIST" spellcheck="false">
-      </label>
-      <label class="field">
-        <span>Tagline</span>
-        <input id="tagline" type="text" maxlength="64" value="ONE NIGHT. TWO KEYS. NO MERCY." spellcheck="false">
-      </label>
-      <label class="field">
-        <span>Credit strip</span>
-        <input id="credit" type="text" maxlength="64" value="VICE FORGE · ISSUE 01 · 2026" spellcheck="false">
-      </label>
-    </section>
-
-    <section class="panel export-panel">
-      <button id="export" type="button" class="btn btn-export">Export PNG</button>
-      <p class="mini" id="status" role="status">Ready.</p>
+      <p class="mini">Each panel gets its own look from the seed — neighbours never match.</p>
     </section>
   </aside>
 
@@ -83,8 +44,78 @@
     <div class="stage-inner" id="stageInner">
       <canvas id="cover" width="1080" height="1080" aria-label="Cover preview"></canvas>
     </div>
-    <footer class="hint" id="hint">Click a panel to select · drag to pan · wheel to zoom · drop photos to add</footer>
+    <footer class="hint" id="hint">Click a panel to select · drag to pan · wheel to zoom · <kbd>E</kbd> export · <kbd>Tab</kbd> cycle · drop photos to add</footer>
   </section>
+
+  <aside class="bar bar-right" id="rightbar">
+    <section class="panel">
+      <h2>Panel inspector <span class="mini" id="panelId">none</span></h2>
+      <div id="inspectorBody">
+        <label class="field">
+          <span>Fill with</span>
+          <select id="panelFill"></select>
+        </label>
+        <label class="field">
+          <span>Colour look</span>
+          <select id="panelLook"></select>
+        </label>
+        <label class="field">
+          <span>Locator name</span>
+          <input id="labelName" type="text" maxlength="30" spellcheck="false">
+        </label>
+        <label class="field">
+          <span>Locator detail</span>
+          <input id="labelSub" type="text" maxlength="36" spellcheck="false">
+        </label>
+        <div class="row">
+          <button id="autoFrame" type="button" class="btn btn-block">Auto-frame</button>
+          <button id="resetCrop" type="button" class="btn btn-block">Reset</button>
+        </div>
+      </div>
+      <p class="mini">Select a panel on the preview, then set what fills it and how it is graded.</p>
+    </section>
+
+    <section class="panel">
+      <h2>Caption band</h2>
+      <label class="field">
+        <span>Headline</span>
+        <input id="headline" type="text" maxlength="40" spellcheck="false">
+      </label>
+      <label class="field">
+        <span>Script accent (Pacifico)</span>
+        <input id="script" type="text" maxlength="42" spellcheck="false">
+      </label>
+      <div class="row">
+        <label class="field grow">
+          <span>Press quote</span>
+          <input id="quote" type="text" maxlength="60" spellcheck="false">
+        </label>
+        <label class="field grow">
+          <span>Source</span>
+          <input id="cite" type="text" maxlength="30" spellcheck="false">
+        </label>
+      </div>
+      <label class="field">
+        <span>Chips (comma-separated)</span>
+        <input id="chips" type="text" maxlength="80" spellcheck="false">
+      </label>
+      <label class="field">
+        <span>Credit strip</span>
+        <input id="credit" type="text" maxlength="72" spellcheck="false">
+      </label>
+      <label class="check">
+        <input type="checkbox" id="starsToggle" checked>
+        <span>Five-star rating row</span>
+      </label>
+    </section>
+
+    <section class="panel export-panel">
+      <p class="mini" id="exportMeta">1080 × 1080</p>
+      <button id="export" type="button" class="btn btn-export">Export PNG</button>
+      <p class="mini status-line" id="status" role="status">Ready.</p>
+      <p class="mini hint-keys"><kbd>E</kbd> export · <kbd>←→↑↓</kbd> nudge crop · <kbd>Shift</kbd> big steps</p>
+    </section>
+  </aside>
 
 </main>
 <script type="module" src="./src/main.js"></script>

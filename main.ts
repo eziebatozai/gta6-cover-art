@@ -4,7 +4,8 @@
 // with the vendored make.fun library. Outside the grader's container, MAKEFUN_OUTPUT_DIR stands
 // in for /output:
 //   mkdir -p out && MAKEFUN_OUTPUT_DIR=out node main.ts
-// Serve it locally with `node serve.ts`, then open http://localhost:8080.
+// Serve it locally with `node serve.ts`, then open http://localhost:8080. Regenerate the three
+// screenshots (and verify PNG exports) with `node tools/shots.mjs` / `node tools/shots.mjs --exports`.
 
 import { cpSync, existsSync, readdirSync, statSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';

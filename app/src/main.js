@@ -1,8 +1,11 @@
 // Page entry: builds the editor, or runs deterministic shot mode when ?shot= is present.
-// The two poster faces ship under app/fonts (OFL-licensed), so wait for them before the
-// first paint — otherwise the arched headline measures in a fallback font.
+// The three poster faces ship under app/fonts (OFL-licensed, see app/fonts/LICENSES.md), and
+// the eight scene plates under app/samples — we wait for both before the first paint, so the
+// arched headline measures in the real Anton and no panel starts blank. If loading stalls, a
+// timeout renders anyway rather than showing nothing.
 
 import { createEditor } from './ui.js';
+import { preloadPlates } from './plates.js';
 import { runShot } from './shots.js';
 
 const canvas = document.getElementById('cover');
@@ -10,11 +13,16 @@ const editor = createEditor(canvas);
 const query = new URLSearchParams(location.search);
 const shot = query.get('shot');
 
-await Promise.all([
-  document.fonts.load('100px Anton'),
-  document.fonts.load('100px "Bebas Neue"'),
+await Promise.race([
+  Promise.all([
+    document.fonts.load('100px Anton'),
+    document.fonts.load('100px "Bebas Neue"'),
+    document.fonts.load('100px Pacifico'),
+    document.fonts.ready,
+    preloadPlates(),
+  ]),
+  new Promise((resolve) => setTimeout(resolve, 4000)),
 ]);
-await document.fonts.ready;
 editor.render();
 
 if (shot) {
