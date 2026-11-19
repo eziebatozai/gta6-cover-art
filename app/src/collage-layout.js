@@ -24,12 +24,12 @@ function collageLandscape() {
 /** Tighter mosaic for a square-ish region (1080x1080) or a portrait one (1080x1350). */
 function collageSquare() {
   return [
-    { x: 0.00, y: 0.00, w: 0.40, h: 1.00 }, // hero
-    { x: 0.40, y: 0.00, w: 0.60, h: 0.30 }, // wide landscape, top right
-    { x: 0.40, y: 0.30, w: 0.30, h: 0.38 }, // square-ish, middle left
-    { x: 0.70, y: 0.30, w: 0.30, h: 0.38 }, // square-ish, middle right
-    { x: 0.40, y: 0.68, w: 0.17, h: 0.32 }, // tall narrow strip
-    { x: 0.57, y: 0.68, w: 0.43, h: 0.32 }, // wide, bottom right
+    { x: 0.00, y: 0.00, w: 0.42, h: 1.00 }, // hero, a touch wider so the square poster reads
+    { x: 0.42, y: 0.00, w: 0.58, h: 0.32 }, // wide landscape, top right
+    { x: 0.42, y: 0.32, w: 0.28, h: 0.40 }, // square-ish, middle left
+    { x: 0.70, y: 0.32, w: 0.30, h: 0.40 }, // square-ish, middle right
+    { x: 0.42, y: 0.72, w: 0.16, h: 0.28 }, // tall narrow strip
+    { x: 0.58, y: 0.72, w: 0.42, h: 0.28 }, // wide, bottom right
   ];
 }
 

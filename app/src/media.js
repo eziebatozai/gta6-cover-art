@@ -11,11 +11,16 @@ export function loadImage(url) {
   });
 }
 
-/** Reads a File into an object URL and loads it. */
+/**
+ * Reads a File into an object URL and loads it. The URL is revoked only after the decode has
+ * had a beat to finish, so the plate cache never ends up holding a dead handle.
+ */
 export async function loadImageFromFile(file) {
   const url = URL.createObjectURL(file);
   try {
-    return await loadImage(url);
+    const img = await loadImage(url);
+    if (img.decode) await img.decode().catch(() => {});
+    return img;
   } finally {
     // Revoke on the next tick so the decode has definitely finished.
     setTimeout(() => URL.revokeObjectURL(url), 1000);

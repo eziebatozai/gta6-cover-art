@@ -13,14 +13,15 @@ const editor = createEditor(canvas);
 const query = new URLSearchParams(location.search);
 const shot = query.get('shot');
 
+const fontsReady = Promise.all([
+  document.fonts.load('100px Anton'),
+  document.fonts.load('100px "Bebas Neue"'),
+  document.fonts.load('100px Pacifico'),
+  document.fonts.ready,
+]).catch(() => {}); // a stalled font must never blank the poster
+
 await Promise.race([
-  Promise.all([
-    document.fonts.load('100px Anton'),
-    document.fonts.load('100px "Bebas Neue"'),
-    document.fonts.load('100px Pacifico'),
-    document.fonts.ready,
-    preloadPlates(),
-  ]),
+  Promise.all([fontsReady, preloadPlates()]),
   new Promise((resolve) => setTimeout(resolve, 4000)),
 ]);
 editor.render();

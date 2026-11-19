@@ -1,5 +1,6 @@
 // Export: the cover rendered at the exact chosen size, downloaded as a PNG with a sensible
-// name. `onPhase` lets the editor show progress during the work.
+// name. `onPhase` lets the editor show progress during the work, and the rendered canvas is
+// created fresh per export so the editor preview never shares buffers with the file.
 
 import { renderCover } from './cover-renderer.js';
 import { SIZES, slug } from './state.js';
@@ -8,6 +9,7 @@ import { SIZES, slug } from './state.js';
 export async function renderExportBlob(state, onPhase) {
   await document.fonts.ready;
   const { w, h } = SIZES[state.size] ?? SIZES['1080x1080'];
+  onPhase?.('render');
   const canvas = document.createElement('canvas');
   canvas.width = w;
   canvas.height = h;

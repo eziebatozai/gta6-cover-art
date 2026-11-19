@@ -220,8 +220,6 @@ input[type="text"]:focus, select:focus {
   color: var(--ink-faint);
   text-align: center;
 }
-.looks { margin-bottom: 17px; }
-
 /* scene plate grid */
 .plate-grid {
   display: grid;
@@ -353,3 +351,4 @@ body.shot-cover .stage-inner {
 
 body.shot-editor #hint { display: none; }
 body.shot-editor .stage-inner { padding: 10px; }
+body.shot-editor #cover { box-shadow: 0 14px 44px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.08); }

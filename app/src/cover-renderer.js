@@ -1,15 +1,16 @@
 // The cover renderer: assembles the whole poster on one canvas at the exact export size.
 // Cream poster stock, a thin dark keyline around the panel region, the layout's panel collage
-// (each panel its own colour grade over its photo or plate, plus a locator label), the drawn
-// art panel where chosen, the caption band and the credit strip. Also returns the panel
-// rectangles in canvas coordinates so the editor can hit-test and select panels.
+// (each panel its own colour grade over its photo or plate, plus a locator label resolved from
+// the plate actually shown), the drawn art panel where chosen, the caption band and the credit
+// strip. Also returns the panel rectangles in canvas coordinates so the editor can hit-test
+// and select panels.
 
 import { layoutPanels } from './collage-layout.js';
 import { cropToDraw } from './crop-transform.js';
 import { gradePhoto, lookDef } from './color-grade.js';
 import { drawArtPanel } from './art-panel.js';
 import { plateImage, plateByKey } from './plates.js';
-import { drawLocatorLabel } from './labels.js';
+import { drawLocatorLabel, resolveLabel } from './labels.js';
 import { captionGeometry, drawCaptionBand, drawCreditStrip } from './caption-band.js';
 import { letterPalette, POSTER_CREAM } from './lettering.js';
 import { SIZES, photoForFill, clampCrop } from './state.js';
@@ -38,9 +39,10 @@ export function renderCover(canvas, state, opts = {}) {
   ctx.fillStyle = POSTER_CREAM;
   ctx.fillRect(0, 0, W, H);
 
-  // Vertical rhythm: top margin, panels, caption band, full-bleed credit strip.
+  // Vertical rhythm: top margin, panels, caption band, full-bleed credit strip. The band keeps
+  // ~21% of the poster so the collage owns it.
   const { bandH, creditH } = captionGeometry(W, H);
-  const margin = Math.round(minWH * 0.026);
+  const margin = Math.round(minWH * 0.024);
   const gutter = Math.max(8, Math.min(14, Math.round(W * 0.0068)));
   const panelsX = margin;
   const panelsY = margin;
@@ -89,7 +91,9 @@ export function renderCover(canvas, state, opts = {}) {
     }
     if (!drew) drawWashPanel(ctx, r, panel.look);
 
-    drawLocatorLabel(ctx, r, panel.label);
+    // The label names the plate actually shown (resolved from the panel's fill, not from a
+    // stale stored label), unless the person edited it by hand.
+    drawLocatorLabel(ctx, r, resolveLabel(panel.fill, panel.label));
     ctx.restore();
 
     // Dark border inside the white gutter.

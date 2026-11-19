@@ -1,28 +1,31 @@
 // The caption band: the bottom of the poster, where the cover sells itself. A top row of chips
-// ("VOL. 06"), a 5-star row with a short press quote, an "EST. 2026" rosette badge, then the
-// huge arched Anton headline with a thick cream outline and warm gradient fill, and a Pacifico
-// script accent under it. Everything auto-fits: two long headline lines still fit the band at
-// every poster size, with a guaranteed gap between the top row and the headline.
-// Below the band sits a thin full-bleed credit strip in tracked Bebas caps.
+// ("VOL. 06") and a 5-star row with a short press quote sit tight against the top of the band,
+// then the huge arched Anton headline with a thick cream outline and warm gradient fill, a
+// clearly readable Pacifico script accent, and (below the band) the thin credit strip.
+// The band owns about 21% of the poster height; the collage owns the rest. Everything is
+// anchored to a 1080-unit scale so 1920x1080, 1080x1080 and 1080x1350 all compose properly
+// instead of merely re-scaling.
 
 import { drawArcLine, fitArcLine, trackedCaps, POSTER_CREAM } from './lettering.js';
 
 /** Geometry: the band's height and the credit strip's height for a poster of W x H. */
 export function captionGeometry(W, H) {
-  const creditH = Math.max(22, Math.round(Math.min(W, H) * 0.032));
-  const bandH = Math.round(H * (H > W ? 0.23 : 0.255));
+  const unit = Math.min(W, H) / 1080;
+  const creditH = Math.max(22, Math.round(30 * unit));
+  const bandH = Math.round(H * (H >= W ? 0.215 : 0.21));
   return { bandH, creditH };
 }
 
 /** The credit strip: a full-bleed dark bar at the very bottom with small tracked caps. */
 export function drawCreditStrip(ctx, W, H, raw, pal) {
   const text = String(raw || '').trim().slice(0, 72);
-  const barH = Math.max(20, Math.round(H * 0.031));
+  const unit = Math.min(W, H) / 1080;
+  const barH = Math.max(20, Math.round(30 * unit));
   ctx.save();
   ctx.fillStyle = pal.ink;
   ctx.fillRect(0, H - barH, W, barH);
   if (text) {
-    const size = barH * 0.52;
+    const size = barH * 0.5;
     trackedCaps(ctx, text, size, 0.34);
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
@@ -82,12 +85,12 @@ function drawRosette(ctx, cx, cy, R, pal) {
   ctx.fillStyle = POSTER_CREAM;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'alphabetic';
-  ctx.font = `${R * 0.34}px "Bebas Neue"`;
+  ctx.font = `${R * 0.38}px "Bebas Neue"`;
   ctx.letterSpacing = `${R * 0.1}px`;
-  ctx.fillText('EST.', cx, cy - R * 0.1);
-  ctx.font = `${R * 0.52}px "Bebas Neue"`;
+  ctx.fillText('EST.', cx, cy - R * 0.06);
+  ctx.font = `${R * 0.56}px "Bebas Neue"`;
   ctx.letterSpacing = `${R * 0.06}px`;
-  ctx.fillText('2026', cx, cy + R * 0.48);
+  ctx.fillText('2026', cx, cy + R * 0.52);
   ctx.letterSpacing = '0px';
   ctx.restore();
 }
@@ -124,49 +127,69 @@ function drawChips(ctx, x, cy, chipTexts, size, pal) {
 }
 
 /**
+ * Fits the headline: the larger of a single line and a balanced two-line split, both within
+ * the band's headline box (up to 82% of the poster width, tall enough for the band).
+ */
+function fitHeadline(ctx, headline, maxW, maxH) {
+  const one = fitArcLine(ctx, headline, maxW, maxH);
+  let best = { lines: [headline], size: one };
+  if (!headline.includes(' ')) return best;
+  const words = headline.split(' ');
+  let bestAt = -1;
+  let bestDiff = Infinity;
+  let acc = 0;
+  const half = [...headline].length / 2;
+  for (let i = 0; i < words.length - 1; i++) {
+    acc += words[i].length + 1;
+    const diff = Math.abs(acc - half);
+    if (diff < bestDiff) {
+      bestDiff = diff;
+      bestAt = i;
+    }
+  }
+  if (bestAt < 0) return best;
+  const two = [words.slice(0, bestAt + 1).join(' '), words.slice(bestAt + 1).join(' ')];
+  if (!two[0] || !two[1]) return best;
+  const s2 = Math.min(fitArcLine(ctx, two[0], maxW, maxH * 0.52), fitArcLine(ctx, two[1], maxW, maxH * 0.52));
+  if (s2 > best.size * 1.12) best = { lines: two, size: s2 };
+  return best;
+}
+
+/**
  * Draws the whole caption band into rect (x, y, w, h) on the poster cream. Returns nothing;
  * geometry was fixed by captionGeometry, so the caller reserved exactly this space.
  */
 export function drawCaptionBand(ctx, x, y, w, h, state, pal) {
   const cx = x + w / 2;
-  const padTop = h * 0.05;
-  const padBottom = h * 0.03;
-  const topRowH = h * 0.2;
-  const gap = h * 0.05; // the guaranteed gap between the top row and the headline
-  const scriptH = h * 0.17;
+  // Anchor the band's type scale to the poster's short side, 1080 = 1:1.
+  const unit = Math.min(w, ctx.canvas.height) / 1080;
+  const padTop = Math.round(12 * unit);   // chips/stars tight against the top of the band
+  const topRowH = Math.round(26 * unit);
+  const gap = Math.round(26 * unit);      // the guaranteed gap under the top row
+  const scriptH = Math.round(34 * unit);
+  const padBottom = Math.round(8 * unit);
   const topY = y + padTop;
-  const topCy = topY + topRowH * 0.52;
+  const topCy = topY + topRowH * 0.5;
 
   // --- top row: chips (left), stars + quote (centre), rosette (right).
-  const rosetteR = topRowH * 0.46;
+  const rosetteR = Math.max(topRowH * 0.62, 19 * unit);
   const chipsTexts = String(state.chips ?? '').split(',').map((s) => s.trim()).filter(Boolean);
-  const chipSize = Math.min(topRowH * 0.36, w * 0.017);
-  let usedRight = 0;
-  let usedLeft = 0;
-  ctx.save();
-  ctx.globalAlpha = 0.999; // measure with real fonts
-  const chipW = chipsTexts.length ? (() => {
-    const probe = document.createElement('canvas').getContext('2d');
-    probe.font = `${chipSize}px "Bebas Neue"`;
-    probe.letterSpacing = `${chipSize * 0.18}px`;
-    return chipsTexts.reduce((a, t) => a + probe.measureText(t.toUpperCase()).width + chipSize * 2.5, chipSize * 0.7 * (chipsTexts.length - 1));
-  })() : 0;
-  usedLeft = chipW;
-  usedRight = rosetteR * 2.24;
-  ctx.restore();
+  const chipSize = Math.min(topRowH * 0.52, 13.5 * unit);
+  const usedRight = rosetteR * 2.3;
 
   const quote = String(state.quote ?? '').trim().toUpperCase().slice(0, 60);
   const cite = String(state.cite ?? '').trim().toUpperCase().slice(0, 30);
   const quoteText = quote ? (cite ? `${quote} \u2014 ${cite}` : quote) : '';
-  const starSize = topRowH * 0.36;
+  const starSize = topRowH * 0.46;
   const starsW = state.stars === false ? 0 : starSize * 5.6;
-  const centreX0 = x + w * 0.06 + usedLeft + w * 0.02;
-  const centreX1 = x + w * 0.94 - usedRight - w * 0.02;
-  const centreW = Math.max(w * 0.2, centreX1 - centreX0);
+  const centreX0 = x + w * 0.05 + (chipsTexts.length ? w * 0.16 : 0);
+  const centreX1 = x + w * 0.95 - usedRight;
+  const centreW = Math.max(w * 0.18, centreX1 - centreX0);
 
   // Quote type fits its slice of the row, shrinking before it would ever collide.
-  let qSize = topRowH * 0.4;
+  let qSize = topRowH * 0.5;
   ctx.save();
+  ctx.globalAlpha = 0.999; // measure with real fonts
   trackedCaps(ctx, quoteText, qSize, 0.14);
   const qw0 = ctx.measureText(quoteText).width + starsW;
   ctx.letterSpacing = '0px';
@@ -196,40 +219,16 @@ export function drawCaptionBand(ctx, x, y, w, h, state, pal) {
   }
   ctx.restore();
 
-  if (chipsTexts.length) drawChips(ctx, x + w * 0.06, topCy, chipsTexts, chipSize, pal);
-  drawRosette(ctx, x + w * 0.94 - rosetteR, topCy, rosetteR, pal);
+  if (chipsTexts.length) drawChips(ctx, x + w * 0.05, topCy, chipsTexts, chipSize, pal);
+  drawRosette(ctx, x + w * 0.95 - rosetteR, topCy, rosetteR, pal);
 
-  // --- headline: auto-fit, auto-shrink, one line or two balanced lines.
+  // --- headline: up to 82% of the poster width, auto-fit to one or two balanced lines.
   const headY = topY + topRowH + gap;
-  const headMaxH = h - (headY - y) - scriptH - gap - padBottom;
-  const headMaxW = w * 0.94;
+  const headMaxH = h - (headY - y) - scriptH - padBottom;
+  const headMaxW = w * 0.82;
   const headline = String(state.headline ?? '').toUpperCase().slice(0, 40);
-  let size = 0;
   if (headline) {
-    let lines = [headline];
-    let size = fitArcLine(ctx, headline, headMaxW, headMaxH);
-    // Two long lines can be much larger than one: split at the space nearest the middle.
-    if (size < headMaxH * 0.42 && headline.includes(' ')) {
-      const words = headline.split(' ');
-      let best = -1;
-      let bestDiff = Infinity;
-      let acc = 0;
-      const half = [...headline].length / 2;
-      for (let i = 0; i < words.length - 1; i++) {
-        acc += words[i].length + 1;
-        const diff = Math.abs(acc - half);
-        if (diff < bestDiff) {
-          bestDiff = diff;
-          best = i;
-        }
-      }
-      const two = [words.slice(0, best + 1).join(' '), words.slice(best + 1).join(' ')];
-      const s2 = Math.min(fitArcLine(ctx, two[0], headMaxW, headMaxH * 0.52), fitArcLine(ctx, two[1], headMaxW, headMaxH * 0.52));
-      if (s2 > size * 1.12) {
-        lines = two;
-        size = s2;
-      }
-    }
+    const { lines, size } = fitHeadline(ctx, headline, headMaxW, headMaxH);
     const lineGap = size * 0.08;
     let by = headY;
     for (const line of lines) {
@@ -238,19 +237,20 @@ export function drawCaptionBand(ctx, x, y, w, h, state, pal) {
     }
   }
 
-  // --- script accent under the headline, Pacifico, warm pink, slightly rotated.
+  // --- script accent under the headline, Pacifico, readable at ~28-34 px on a 1080 poster.
   const scriptText = String(state.script ?? '').trim().slice(0, 42);
   if (scriptText) {
     ctx.save();
-    let sSize = Math.min(scriptH * 0.86, Math.max(12, size * 0.46));
+    const sBase = 31 * unit;
+    let sSize = Math.max(27 * unit, Math.min(34 * unit, sBase));
     ctx.font = `${sSize}px Pacifico`;
     ctx.textAlign = 'center';
     let sw = ctx.measureText(scriptText).width;
     if (sw > headMaxW) {
-      sSize = (sSize * headMaxW) / sw;
+      sSize = Math.max(22 * unit, (sSize * headMaxW) / sw);
       ctx.font = `${sSize}px Pacifico`;
     }
-    const sY = y + h - padBottom - scriptH * 0.28;
+    const sY = y + h - padBottom - sSize * 0.18;
     ctx.translate(cx, sY);
     ctx.rotate(-0.022);
     ctx.shadowColor = 'rgba(30,10,30,0.28)';

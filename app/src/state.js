@@ -4,7 +4,7 @@
 
 import { layoutPanels } from './collage-layout.js';
 import { PLATES, ART_PLATE, plateByKey } from './plates.js';
-import { makeRng, shuffled, between } from './rng.js';
+import { makeRng, shuffled, between, pick } from './rng.js';
 
 export const SIZES = {
   '1080x1080': { w: 1080, h: 1080 },
@@ -59,19 +59,39 @@ export function makePhoto(img, name) {
   };
 }
 
+/** The default locator label for a fill: the plate's own name and time line. */
+function labelForFillId(fill) {
+  if (fill === 'art') return { name: ART_PLATE.name, sub: ART_PLATE.time };
+  const plate = typeof fill === 'string' ? plateByKey(fill) : null;
+  if (plate) return { name: plate.name, sub: plate.time };
+  if (typeof fill === 'string' && fill.startsWith('photo:')) {
+    return { name: 'YOUR PHOTO', sub: 'FROM YOUR CAMERA ROLL' };
+  }
+  return null;
+}
+
 function panelCountOf(state) {
   const { w, h } = SIZES[state.size] ?? SIZES['1080x1080'];
   return layoutPanels(state.layout, w / h).length;
 }
 
-/** A believable default crop for a panel: around the plate's focus, a slight punch-in. */
+/**
+ * A believable default crop for a panel: around the plate's focus, honouring its framing bias
+ * ('low' plates sit lower in frame, 'high' plates higher), with a slight seeded punch-in.
+ */
 function seededCrop(rng, plate) {
+  const framing = plate?.framing ?? 'centre';
+  const biasCy = { low: 0.6, high: 0.36, centre: 0.48 }[framing] ?? 0.48;
   const fx = plate?.focus?.[0] ?? 0.5;
-  const fy = plate?.focus?.[1] ?? 0.44;
+  // 'low' plates (water/road/pier) carry big empty skies, so they also punch in deeper; 'high'
+  // plates (neon signs, skylines) need the zoom too, so the clamp leaves their headroom usable.
+  const zoomRange = plate?.zoom
+    ?? { low: [1.24, 1.5], high: [1.24, 1.4], centre: [1.06, 1.26] }[framing]
+    ?? [1.06, 1.26];
   return {
     cx: Math.min(0.62, Math.max(0.38, fx + between(rng, -0.03, 0.03))),
-    cy: Math.min(0.66, Math.max(0.34, fy + between(rng, -0.025, 0.025))),
-    zoom: between(rng, 1.06, 1.26),
+    cy: Math.min(0.7, Math.max(0.3, biasCy + between(rng, -0.025, 0.025))),
+    zoom: between(rng, zoomRange[0], zoomRange[1]),
   };
 }
 
@@ -90,8 +110,6 @@ function assignLooks(rng, n) {
     }
     looks.push(look);
   }
-  // The hero panel carries the poster's key light: warm sunset two times in three.
-  if (n > 0 && rng() < 0.72) looks[0] = rng() < 0.55 ? 'sunset' : 'heat';
   return looks;
 }
 
@@ -125,15 +143,15 @@ export function rebuildPanels(state) {
   if (state.artPanel && n > 1) fills[n - 1] = 'art';
 
   const looks = assignLooks(rng, n);
-  state.panels = fills.map((fill, i) => {
-    const plate = plateByKey(fill.replace(/^plate:/, ''));
-    return {
-      fill,
-      look: looks[i],
-      label: { name: plate ? plate.name : 'VICE SUNSET', sub: plate ? plate.time : ART_PLATE.time },
-      crop: seededCrop(rng, plate),
-    };
-  });
+  // The hero panel is the face of the poster: the woman-in-car plate always gets the warm
+  // sunset grade; a user photo there takes sunset or heat.
+  if (n > 0) looks[0] = fills[0] === 'car' ? 'sunset' : pick(rng, ['sunset', 'heat']);
+  state.panels = fills.map((fill, i) => ({
+    fill,
+    look: looks[i],
+    label: labelForFillId(fill),
+    crop: seededCrop(rng, plateByKey(fill)),
+  }));
   if (state.selectedPanel >= n) state.selectedPanel = -1;
 }
 
@@ -163,4 +181,14 @@ export function clampCrop(crop) {
 /** Slug used in export filenames. */
 export function slug(text) {
   return (text || 'cover').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40) || 'cover';
+}
+
+/**
+ * A fresh default crop for a fill, honouring the plate's framing bias. Used when a panel's
+ * fill changes after the initial deal (shot recipes, the inspector), so the crop always
+ * matches the photo actually shown — never the one that used to sit there.
+ */
+export function cropForFill(fill, seed) {
+  const rng = makeRng((seed >>> 0) ^ 0x7c0e);
+  return seededCrop(rng, fill === 'art' ? ART_PLATE : plateByKey(fill));
 }

@@ -22,13 +22,13 @@ export const OUTLINE_CREAM = '#fdf8ea';
  * Fits one line of arched Anton inside maxW/maxH: returns the font size that fits both the
  * width (with tracking) and the block height (cap height + arc).
  */
-export function fitArcLine(ctx, text, maxW, maxH, sagRatio = 0.1) {
+export function fitArcLine(ctx, text, maxW, maxH, sagRatio = 0.08) {
   const probe = 100;
   ctx.font = `${probe}px Anton`;
-  ctx.letterSpacing = `${probe * 0.02}px`;
+  ctx.letterSpacing = `${probe * 0.015}px`;
   const w0 = ctx.measureText(text).width;
   const sizeW = w0 > 0 ? (probe * maxW) / w0 : probe;
-  const sizeH = maxH / (1 + sagRatio + 0.06);
+  const sizeH = maxH / (1 + sagRatio + 0.04);
   ctx.letterSpacing = '0px';
   return Math.max(8, Math.min(sizeW, sizeH));
 }
@@ -41,12 +41,12 @@ export function fitArcLine(ctx, text, maxW, maxH, sagRatio = 0.1) {
 export function drawArcLine(ctx, raw, cx, y, size, opts = {}) {
   const text = String(raw || '').toUpperCase();
   if (!text) return 0;
-  const sag = size * (opts.sagRatio ?? 0.1);
+  const sag = size * (opts.sagRatio ?? 0.08);
   const cap = size * 0.73;
-  const outline = opts.outline ?? Math.max(2, size * 0.11);
+  const outline = opts.outline ?? Math.max(2, size * 0.12);
   const grad = opts.gradient ?? [
     { at: 0, color: '#fff3cf' },
-    { at: 0.55, color: '#ffbe62' },
+    { at: 0.5, color: '#ffbe62' },
     { at: 1, color: '#e0561f' },
   ];
   const ink = opts.ink ?? '#1d1026';
@@ -58,7 +58,7 @@ export function drawArcLine(ctx, raw, cx, y, size, opts = {}) {
   ctx.textBaseline = 'alphabetic';
   const chars = [...text];
   const widths = chars.map((c) => ctx.measureText(c).width);
-  const track = size * 0.02;
+  const track = size * 0.015;
   const total = widths.reduce((a, b) => a + b, 0) + track * (chars.length - 1);
   let x = cx - total / 2;
 
@@ -76,12 +76,18 @@ export function drawArcLine(ctx, raw, cx, y, size, opts = {}) {
     ctx.lineJoin = 'round';
     ctx.miterLimit = 2;
 
-    // Drop shadow: the whole letter shape, dark, soft, offset down.
-    ctx.shadowColor = 'rgba(24,10,30,0.5)';
-    ctx.shadowBlur = size * 0.08;
-    ctx.shadowOffsetY = size * 0.05;
+    // Drop shadow: the whole letter shape, dark, soft, offset down. A low blur and a stroke
+    // barely wider than the cream outline keep the shadow from climbing above the cap height
+    // into the row above.
+    ctx.shadowColor = 'rgba(24,10,30,0.55)';
+    ctx.shadowBlur = size * 0.05;
+    ctx.shadowOffsetY = size * 0.07;
     ctx.strokeStyle = ink;
-    ctx.lineWidth = outline * 1.5;
+    ctx.lineWidth = outline * 1.25;
+    ctx.strokeText(chars[i], 0, 0);
+    ctx.shadowColor = 'rgba(24,10,30,0.3)';
+    ctx.shadowBlur = size * 0.02;
+    ctx.shadowOffsetY = size * 0.1;
     ctx.strokeText(chars[i], 0, 0);
     ctx.shadowColor = 'transparent';
     ctx.shadowBlur = 0;

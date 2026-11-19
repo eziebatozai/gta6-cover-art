@@ -6,13 +6,14 @@
 // preview. Parameters: size, layout, look, seed, headline, script, quote, cite, chips, credit,
 // stars=0, art=0, plates (comma list of plate keys / 'art' / 'user' in panel order), looks
 // (comma list of look names per panel), photo (app-relative path, repeatable, loaded as the
-// person's own photo), panel (preselect index). Everything renders from the seed, never
-// Math.random, so the same URL always paints the same pixels. window.__shotReady is set once
-// the canvas has painted.
+// person's own photo), panel (preselect index, default 0 in the editor). Everything renders
+// from the seed, never the platform’s random, so the same URL always paints the same pixels. Locator
+// labels follow the fills automatically (each plate owns its name and time line), so a recipe
+// never has to spell them out. window.__shotReady is set once the canvas has painted.
 
 import { seedFromString } from './rng.js';
-import { LOOKS, rebuildPanels } from './state.js';
-import { PLATES, ART_PLATE, plateByKey } from './plates.js';
+import { LOOKS, rebuildPanels, cropForFill } from './state.js';
+import { PLATES } from './plates.js';
 
 export async function runShot(shot, query, editor) {
   const { state } = editor;
@@ -57,9 +58,11 @@ export async function runShot(shot, query, editor) {
   const looks = query.get('looks');
   const lookList = looks ? looks.split(',').map((s) => s.trim()).filter(Boolean) : [];
   let userIndex = 0;
+  const forced = [];
   state.panels.forEach((panel, i) => {
     const fill = plateList[i];
     if (fill) {
+      forced[i] = true;
       if (fill === 'user') {
         const photo = state.photos[userIndex++];
         if (photo) {
@@ -68,19 +71,25 @@ export async function runShot(shot, query, editor) {
         }
       } else if (fill === 'art') {
         panel.fill = 'art';
-        panel.label = { name: ART_PLATE.name, sub: ART_PLATE.time };
+        panel.label = { name: 'VICE SUNSET', sub: 'NOW SHOWING · ALL NIGHT' };
       } else if (plateKeys.has(fill)) {
+        // Just set the fill: the label is derived from the plate at draw time, so it can
+        // never drift away from the photo beside it.
         panel.fill = fill;
-        const plate = plateByKey(fill);
-        panel.label = { name: plate.name, sub: plate.time };
+        panel.label = null;
       }
     }
     if (lookList[i] && LOOKS.includes(lookList[i])) panel.look = lookList[i];
   });
+  // A forced fill re-seeds the crop for the plate actually shown, so a panel never keeps the
+  // framing of a different photo.
+  state.panels.forEach((panel, i) => {
+    if (forced[i] && panel.fill !== 'wash') panel.crop = cropForFill(panel.fill, state.seed + i * 131);
+  });
 
   // Preselect a panel so the editor shot shows the selection outline and panel controls.
   const panelRaw = query.get('panel');
-  const panel = panelRaw === null ? NaN : Number(panelRaw);
+  const panel = panelRaw === null ? (shot === 'editor' ? 0 : NaN) : Number(panelRaw);
   if (Number.isInteger(panel) && panel >= 0 && panel < state.panels.length) {
     state.selectedPanel = panel;
   }
@@ -98,3 +107,4 @@ export async function runShot(shot, query, editor) {
 function nextFrame() {
   return new Promise((resolve) => requestAnimationFrame(() => resolve()));
 }
+

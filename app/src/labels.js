@@ -1,9 +1,32 @@
 // Locator labels: every panel carries a small caption bar — a dark translucent strip along the
 // panel's bottom edge with a bold caps name and a smaller detail line under it, like a contact
-// sheet's margin notes. Defaults are seeded per panel; the inspector edits both lines.
+// sheet's margin notes. The label always names the plate actually shown: it is resolved from
+// the panel's fill at draw time (plates.js keeps the seeded time line per plate), and only an
+// explicit inspector edit (label.user) can override it. Defaults are seeded per panel.
+
+import { plateByKey, ART_PLATE } from './plates.js';
 
 export function makeLabel(name, sub) {
   return { name, sub };
+}
+
+/**
+ * The label for a panel's fill, whatever it currently is: a plate key resolves to that plate's
+ * name and seeded time line, 'art' to the drawn panel's identity, a user photo to its camera-
+ * roll caption, and anything fill-less (a wash) to nothing. An inspector edit on the panel
+ * (label.user) wins over every default, so hand-written labels never get clobbered.
+ */
+export function resolveLabel(fill, label) {
+  if (label && label.user && (label.name || label.sub)) return label;
+  if (fill === 'art') return { name: ART_PLATE.name, sub: ART_PLATE.time };
+  const plate = typeof fill === 'string' ? plateByKey(fill) : null;
+  if (plate) return { name: plate.name, sub: plate.time };
+  if (typeof fill === 'string' && fill.startsWith('photo:')) {
+    return label && (label.name || label.sub)
+      ? label
+      : { name: 'YOUR PHOTO', sub: 'FROM YOUR CAMERA ROLL' };
+  }
+  return null;
 }
 
 /** Draws the locator bar inside panel rect r. Never drawn above r (it hugs the bottom edge). */

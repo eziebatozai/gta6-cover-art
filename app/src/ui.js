@@ -6,7 +6,7 @@
 import { SIZES, LAYOUTS, makeState, makePhoto, clampCrop, reshuffle, rebuildPanels } from './state.js';
 import { layoutPanels } from './collage-layout.js';
 import { LOOK_DEFS } from './color-grade.js';
-import { PLATES, ART_PLATE, plateImage } from './plates.js';
+import { PLATES, ART_PLATE, plateByKey, plateImage } from './plates.js';
 import { renderCover } from './cover-renderer.js';
 import { downloadCover } from './exporter.js';
 import { loadImage, loadImageFromFile } from './media.js';
@@ -96,7 +96,7 @@ export function createEditor(canvas) {
     const b = document.createElement('button');
     b.type = 'button';
     b.dataset.value = key;
-    b.title = def.label;
+    b.title = LOOK_LABELS[key];
     b.style.setProperty('--c1', def.accent);
     b.style.setProperty('--c2', def.map[0]);
     b.innerHTML = `<span>${def.label}</span>`;
@@ -257,12 +257,20 @@ export function createEditor(canvas) {
       return;
     }
     state.panels[sel].fill = fill;
-    const plate = PLATES.find((p) => p.key === fill);
-    if (plate) state.panels[sel].label = { name: plate.name, sub: plate.time };
-    else if (fill === 'art') state.panels[sel].label = { name: ART_PLATE.name, sub: ART_PLATE.time };
-    else {
+    // The crop re-seeds for the plate actually shown, so its framing matches the new photo.
+    if (typeof fill === 'string' && (fill === 'art' || PLATES.some((p) => p.key === fill))) {
+      state.panels[sel].crop = cropForFill(fill, state.seed + sel * 131);
+    }
+    // The locator label follows the plate shown (resolved at draw time); only user photos
+    // need an explicit caption, and a hand-edited label (label.user) is never overwritten.
+    const panel = state.panels[sel];
+    if (String(fill).startsWith('photo:')) {
       const photo = state.photos.find((p) => p.id === fill);
-      if (photo) state.panels[sel].label = { name: (photo.name || 'YOUR PHOTO').toUpperCase(), sub: 'FROM YOUR CAMERA ROLL' };
+      if (photo && !(panel.label?.user)) {
+        panel.label = { name: (photo.name || 'YOUR PHOTO').toUpperCase(), sub: 'FROM YOUR CAMERA ROLL' };
+      }
+    } else if (fill === 'wash' && !(panel.label?.user)) {
+      panel.label = null;
     }
     ui.render();
   }
@@ -298,10 +306,23 @@ export function createEditor(canvas) {
     const lookSel = $('panelLook');
     lookSel.disabled = !panel;
     lookSel.value = panel ? panel.look : '';
-    $('labelName').value = panel ? (panel.label?.name ?? '') : '';
-    $('labelSub').value = panel ? (panel.label?.sub ?? '') : '';
+    // The inspector shows the label that will actually draw: the plate's own caption.
+    const shown = panel ? resolveShownLabel(panel) : null;
+    $('labelName').value = shown ? shown.name ?? '' : '';
+    $('labelSub').value = shown ? shown.sub ?? '' : '';
     $('labelName').disabled = !panel;
     $('labelSub').disabled = !panel;
+  }
+
+  function resolveShownLabel(panel) {
+    if (panel.label?.user) return panel.label;
+    if (panel.fill === 'art') return { name: 'VICE SUNSET', sub: 'NOW SHOWING · ALL NIGHT' };
+    const plate = typeof panel.fill === 'string' ? plateByKey(panel.fill) : null;
+    if (plate) return { name: plate.name, sub: plate.time };
+    if (String(panel.fill).startsWith('photo:')) {
+      return panel.label ?? { name: 'YOUR PHOTO', sub: 'FROM YOUR CAMERA ROLL' };
+    }
+    return null;
   }
 
   $('panelFill').addEventListener('change', (e) => {
@@ -327,7 +348,8 @@ export function createEditor(canvas) {
     $(id).addEventListener('input', (e) => {
       const panel = state.panels[state.selectedPanel];
       if (!panel) return;
-      panel.label = { ...panel.label, [key]: e.target.value };
+      // A hand edit takes ownership of the label so re-renders never clobber it.
+      panel.label = { ...panel.label, [key]: e.target.value, user: true };
       ui.render();
     });
   }
@@ -335,7 +357,8 @@ export function createEditor(canvas) {
   $('autoFrame').addEventListener('click', () => {
     const panel = state.panels[state.selectedPanel];
     if (panel) {
-      panel.crop = autoFrame(panel.crop);
+      const plate = typeof panel.fill === 'string' ? plateByKey(panel.fill) : null;
+      panel.crop = autoFrame(panel.crop, { framing: plate?.framing, focus: plate?.focus });
       ui.render();
     }
   });
@@ -401,7 +424,6 @@ export function createEditor(canvas) {
     dragging = null;
   });
 
-  // Keyboard: E exports, arrows nudge the selected crop, Tab cycles panels.
   canvas.addEventListener('wheel', (e) => {
     const { x, y } = toCanvas(e);
     const idx = panelAt(x, y);

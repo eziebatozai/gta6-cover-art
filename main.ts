@@ -6,8 +6,7 @@
 //   mkdir -p out && MAKEFUN_OUTPUT_DIR=out node main.ts
 // Serve it locally with `node serve.ts`, then open http://localhost:8080. Regenerate the three
 // screenshots (and verify PNG exports) with `node tools/shots.mjs` / `node tools/shots.mjs --exports`.
-
-import { cpSync, existsSync, readdirSync, statSync, mkdirSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, readdirSync, statSync, mkdirSync, writeFileSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { buildDossier } from './vendor/makefun-app.ts';
@@ -41,6 +40,28 @@ if (!existsSync(screenshotsDir)) {
   process.exit(1);
 }
 
+// The screenshots must sit inside the scorer's caps too: at most 256 KiB each, long side at
+// most 1280 and short side at least 480. A JPEG that slipped past the driver is refused here,
+// before it can reach the dossier.
+const screenshotCaps = { max_bytes: DOSSIER_CAPS.screenshots.max_bytes, max_long: 1280, min_short: 480 };
+for (const file of listFiles(screenshotsDir)) {
+  const dims = jpegSize(join(screenshotsDir, file));
+  const bytes = statSync(join(screenshotsDir, file)).size;
+  if (!dims) {
+    console.error(`main.ts: ${file} is not a decodable JPEG.`);
+    process.exit(1);
+  }
+  const long = Math.max(dims.w, dims.h);
+  const short = Math.min(dims.w, dims.h);
+  if (bytes > screenshotCaps.max_bytes || long > screenshotCaps.max_long || short < screenshotCaps.min_short) {
+    console.error(
+      `main.ts: ${file} is ${dims.w}x${dims.h}, ${(bytes / 1024).toFixed(0)} KiB — outside the caps ` +
+      `(<= ${screenshotCaps.max_bytes} bytes, long <= ${screenshotCaps.max_long}, short >= ${screenshotCaps.min_short}).`,
+    );
+    process.exit(1);
+  }
+}
+
 mkdirSync(out, { recursive: true });
 cpSync(appDir, join(out, 'app'), { recursive: true });
 mkdirSync(join(out, 'screenshots'), { recursive: true });
@@ -61,6 +82,28 @@ function statIsFile(path) {
     return statSync(path).isFile();
   } catch {
     return false;
+  }
+}
+
+/** Reads a JPEG's SOF0/SOF2 marker for its dimensions, or null when it is not a JPEG. */
+function jpegSize(file) {
+  try {
+    const buf = readFileSync(file);
+    if (buf.readUInt16BE(0) !== 0xffd8) return null;
+    let off = 2;
+    while (off + 9 < buf.length) {
+      if (buf[off] !== 0xff) return null;
+      const marker = buf[off + 1];
+      const len = buf.readUInt16BE(off + 2);
+      if ((marker >= 0xc0 && marker <= 0xc3) || marker === 0xc5 || marker === 0xc6 || marker === 0xc7 ||
+          (marker >= 0xc9 && marker <= 0xcb) || (marker >= 0xcd && marker <= 0xcf)) {
+        return { h: buf.readUInt16BE(off + 5), w: buf.readUInt16BE(off + 7) };
+      }
+      off += 2 + len;
+    }
+    return null;
+  } catch {
+    return null;
   }
 }
 

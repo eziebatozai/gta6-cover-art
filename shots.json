@@ -1,23 +1,23 @@
 [
   {
     "name": "1-cover-wide.jpg",
-    "query": "?shot=cover&size=1920x1080&layout=collage&seed=7&art=0&plates=car,water,neon,carlyle,motel,marina&looks=sunset,vice,heat,noir,heat,vice&headline=VICE%20CITY%20HEIST&script=one%20night%20in%20paradise&quote=A%20FEVER%20DREAM%20IN%20NEON&cite=THE%20COAST%20HERALD&chips=VOL.%2006,%20COLLECTOR'S%20EDITION&credit=VICE%20FORGE%20%C2%B7%20SHOT%20ON%2035MM%20%C2%B7%20DEVELOPED%20IN%20THE%20DARK",
+    "query": "?shot=cover&size=1920x1080&layout=collage&seed=7&art=0&plates=car,water,neon,carlyle,marina,motel&looks=sunset,vice,neon,heat,vice,noir&headline=VICE%20CITY%20HEIST&script=one%20night%20in%20paradise&quote=A%20FEVER%20DREAM%20IN%20NEON&cite=THE%20COAST%20HERALD&chips=VOL.%2006,%20COLLECTOR'S%20EDITION&credit=VICE%20FORGE%20%C2%B7%20SHOT%20ON%2035MM%20%C2%B7%20DEVELOPED%20IN%20THE%20DARK",
     "w": 1280,
     "h": 720,
-    "quality": 86
+    "quality": 88
   },
   {
     "name": "2-editor.jpg",
-    "query": "?shot=editor&size=1080x1080&layout=collage&seed=11&art=0&photo=samples/boulevard.jpg&plates=car,water,neon,carlyle,pier26,marina&looks=heat,sunset,neon,vice,heat,neon&panel=0&headline=BAHIA%20BOULEVARD&script=her%20last%20summer&quote=SUNSCREEN%20AND%20SMOKED%20GLASS&cite=OCEAN%20WEEKLY&credit=VICE%20FORGE%20%C2%B7%20ISSUE%2006",
+    "query": "?shot=editor&size=1080x1080&layout=collage&seed=11&art=0&photo=samples/boulevard.jpg&plates=user,water,neon,carlyle,pier26,marina&looks=sunset,heat,neon,heat,neon,sunset&panel=0&headline=BAHIA%20BOULEVARD&script=her%20last%20summer&quote=SUNSCREEN%20AND%20SMOKED%20GLASS&cite=OCEAN%20WEEKLY&credit=VICE%20FORGE%20%C2%B7%20ISSUE%2006",
     "w": 1280,
     "h": 720,
-    "quality": 86
+    "quality": 88
   },
   {
     "name": "3-cover-square.jpg",
-    "query": "?shot=cover&size=1080x1080&layout=collage&seed=23&art=0&plates=neon,marina,car,angler,water,carlyle&looks=neon,vice,heat,vice,heat,sunset&headline=MIDNIGHT%20MARINA&script=the%20city%20never%20sleeps&quote=ELECTRIC%20SALT%20AIR&cite=HARBOR%20LIGHT&chips=NIGHT%20SHIFT,%20VOL.%2006&credit=VICE%20FORGE%20%C2%B7%20AFTER%20DARK%20SERIES",
+    "query": "?shot=cover&size=1080x1080&layout=collage&seed=23&art=0&plates=neon,marina,car,angler,water,carlyle&looks=neon,neon,heat,vice,neon,heat&headline=MIDNIGHT%20MARINA&script=the%20city%20never%20sleeps&quote=ELECTRIC%20SALT%20AIR&cite=HARBOR%20LIGHT&chips=NIGHT%20SHIFT,%20VOL.%2006&credit=VICE%20FORGE%20%C2%B7%20AFTER%20DARK%20SERIES",
     "w": 1080,
     "h": 1080,
-    "quality": 86
+    "quality": 88
   }
 ]

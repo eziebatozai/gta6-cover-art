@@ -1,5 +1,7 @@
 // Screenshot driver: serves app/ on a free port, opens each recipe from shots.json in headless
 // Chromium (Playwright), waits for window.__shotReady, and writes the JPEGs into screenshots/.
+// Every written JPEG is checked against the entry's caps — ≤ 256 KiB, long side ≤ 1280,
+// short side ≥ 480 — and the driver fails loudly when a recipe breaks one.
 // `node tools/shots.mjs --exports` additionally verifies the export path: in the editor it
 // clicks Export for all three sizes and checks each downloaded PNG's IHDR dimensions.
 
@@ -12,6 +14,10 @@ import { readFileSync, mkdirSync, existsSync, statSync } from 'node:fs';
 const here = fileURLToPath(new URL('..', import.meta.url));
 const appRoot = join(here, 'app');
 const shotsDir = join(here, 'screenshots');
+
+const MAX_BYTES = 256 * 1024;
+const MAX_LONG = 1280;
+const MIN_SHORT = 480;
 
 let chromium;
 try {
@@ -108,7 +114,14 @@ if (process.argv.includes('--exports')) {
     const out = join(outDir, r.name);
     await page.screenshot({ path: out, type: 'jpeg', quality: r.quality ?? 88 });
     const bytes = statSync(out).size;
-    console.log(`${r.name}: ${r.w}x${r.h}, ${(bytes / 1024).toFixed(0)} KiB`);
+    const problems = [];
+    if (bytes > MAX_BYTES) problems.push(`over the 256 KiB cap (${(bytes / 1024).toFixed(0)} KiB)`);
+    const long = Math.max(r.w, r.h);
+    const short = Math.min(r.w, r.h);
+    if (long > MAX_LONG) problems.push(`long side ${long} > ${MAX_LONG}`);
+    if (short < MIN_SHORT) problems.push(`short side ${short} < ${MIN_SHORT}`);
+    console.log(`${r.name}: ${r.w}x${r.h}, ${(bytes / 1024).toFixed(0)} KiB${problems.length ? ` — FAIL: ${problems.join(', ')}` : ''}`);
+    if (problems.length) process.exitCode = 1;
     await page.close();
   }
 }

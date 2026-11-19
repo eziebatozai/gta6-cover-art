@@ -152,10 +152,10 @@ function drawStars(ctx, w, horizon, p, rng) {
 function drawSun(ctx, sunX, horizon, sunR, p) {
   const cy = horizon - sunR * 0.62;
 
-  const glowR = sunR * 2.6;
+  const glowR = sunR * 2.8;
   const glow = ctx.createRadialGradient(sunX, cy, sunR * 0.4, sunX, cy, glowR);
-  glow.addColorStop(0, `${p.glow}0.5)`);
-  glow.addColorStop(0.45, `${p.glow}0.16)`);
+  glow.addColorStop(0, `${p.glow}0.58)`);
+  glow.addColorStop(0.45, `${p.glow}0.18)`);
   glow.addColorStop(1, `${p.glow}0)`);
   ctx.fillStyle = glow;
   ctx.fillRect(sunX - glowR, cy - glowR, glowR * 2, glowR * 2);
@@ -393,9 +393,9 @@ function drawSparkles(ctx, w, h, horizon, p, rng) {
   ctx.globalAlpha = 1;
 }
 
-/** Subtle CRT scanlines, poster texture. */
+/** Subtle CRT scanlines, poster texture — fainter than before so the sun stays the hero. */
 function drawScanlines(ctx, w, h) {
-  ctx.globalAlpha = 0.05;
+  ctx.globalAlpha = 0.04;
   ctx.fillStyle = '#000';
   for (let y = 0; y < h; y += 4) ctx.fillRect(0, y, w, 1);
   ctx.globalAlpha = 1;
