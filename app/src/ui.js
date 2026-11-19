@@ -1,9 +1,9 @@
 // The editor: builds every control, wires the canvas preview interactions (click to select a
-// panel, drag to pan its crop, wheel to zoom, keyboard shortcuts) and keeps the state and the
-// live render in step. Shot mode reuses the same editor object, so screenshots exercise
-// exactly what a judge would click.
+// panel, drag to pan its crop, wheel to zoom, double-click to reset it, keyboard shortcuts)
+// and keeps the state and the live render in step. Shot mode reuses the same editor object,
+// so screenshots exercise exactly what a judge would click.
 
-import { SIZES, LAYOUTS, makeState, makePhoto, clampCrop, reshuffle, rebuildPanels } from './state.js';
+import { SIZES, LAYOUTS, makeState, makePhoto, clampCrop, reshuffle, rebuildPanels, cropForFill } from './state.js';
 import { layoutPanels } from './collage-layout.js';
 import { LOOK_DEFS } from './color-grade.js';
 import { PLATES, ART_PLATE, plateByKey, plateImage } from './plates.js';
@@ -354,22 +354,28 @@ export function createEditor(canvas) {
     });
   }
 
-  $('autoFrame').addEventListener('click', () => {
+  function autoFrameSelected() {
     const panel = state.panels[state.selectedPanel];
     if (panel) {
       const plate = typeof panel.fill === 'string' ? plateByKey(panel.fill) : null;
-      panel.crop = autoFrame(panel.crop, { framing: plate?.framing, focus: plate?.focus });
+      panel.crop = autoFrame(panel.crop, {
+        framing: plate?.framing,
+        focus: plate?.focus,
+        zoom: plate?.zoom,
+      });
       ui.render();
     }
-  });
+  }
+  $('autoFrame').addEventListener('click', autoFrameSelected);
 
-  $('resetCrop').addEventListener('click', () => {
+  function resetCropSelected() {
     const panel = state.panels[state.selectedPanel];
     if (panel) {
       panel.crop = { cx: 0.5, cy: 0.5, zoom: 1 };
       ui.render();
     }
-  });
+  }
+  $('resetCrop').addEventListener('click', resetCropSelected);
 
   // ---------- canvas interactions ----------
 
@@ -424,6 +430,16 @@ export function createEditor(canvas) {
     dragging = null;
   });
 
+  // Double-click resets the selected panel's crop to the plain cover fit.
+  canvas.addEventListener('dblclick', (e) => {
+    const { x, y } = toCanvas(e);
+    const idx = panelAt(x, y);
+    if (idx >= 0) {
+      select(idx);
+      resetCropSelected();
+    }
+  });
+
   canvas.addEventListener('wheel', (e) => {
     const { x, y } = toCanvas(e);
     const idx = panelAt(x, y);
@@ -439,12 +455,18 @@ export function createEditor(canvas) {
     ui.render();
   }, { passive: false });
 
-  // Keyboard: E exports, arrows nudge the selected crop, Tab cycles panels.
+  // Keyboard: E exports, F auto-frames the selected panel, arrows nudge the selected crop,
+  // Tab cycles panels.
   window.addEventListener('keydown', (e) => {
     if (e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement || e.target instanceof HTMLTextAreaElement) return;
     if (e.key === 'e' || e.key === 'E') {
       e.preventDefault();
       exportCover();
+      return;
+    }
+    if (e.key === 'f' || e.key === 'F') {
+      e.preventDefault();
+      autoFrameSelected();
       return;
     }
     if (e.key === 'Tab') {
@@ -459,11 +481,12 @@ export function createEditor(canvas) {
       const panel = state.panels[state.selectedPanel];
       if (!panel) return;
       const step = e.shiftKey ? 0.05 : 0.012;
-      panel.crop = {
+      // Nudges are clamped like a drag, so the crop can never leave its photo.
+      panel.crop = clampCrop({
         ...panel.crop,
         cx: panel.crop.cx + arrows[e.key][0] * step,
         cy: panel.crop.cy + arrows[e.key][1] * step,
-      };
+      });
       ui.render();
     }
   });

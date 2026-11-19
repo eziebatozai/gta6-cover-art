@@ -86,23 +86,26 @@ export function zoomCrop(crop, factor, img, panelAspect, fx = 0.5, fy = 0.5) {
 
 /**
  * Auto-frame: a starting point that flatters the plate actually shown. `hint` carries the
- * plate's framing bias and its focus point:
- *   - 'low'  (water, road, pier plates): bias to the lower-middle third so a wide panel never
- *     shows an empty sky band where the horizon sits high;
- *   - 'high' (neon signs, skylines): bias to the upper-middle third so the sign heads stay in;
+ * plate's framing bias, its focus point and its zoom range:
+ *   - 'low'  (water, road, motel plates): the story sits in the lower two thirds — the frame
+ *     centres there and stays wide, so a wide panel never crops the story away;
+ *   - 'high' (neon signs, deco parapets): the frame centres just above mid, in the sign band;
  *   - 'centre' (faces, interiors): keep the plate's own focus, mid-frame.
- * The zoom punches in just enough to tighten the composition.
+ * The zoom comes from the plate's own range: the frame tightens to the plate, and a hand
+ * zoom-out is respected up to the plate's widest storytelling frame.
  */
 export function autoFrame(crop, hint = {}) {
   const bias = hint.framing ?? 'centre';
   const fx = hint.focus?.[0] ?? 0.5;
   const fy = hint.focus?.[1] ?? 0.5;
   // Where the frame's centre should sit, in image units, per bias.
-  const cyByBias = { low: 0.62, high: 0.36, centre: 0.5 };
+  const cyByBias = { low: 0.58, high: 0.42, centre: 0.5 };
   const targetCy = bias === 'centre' ? Math.min(0.66, Math.max(0.36, fy)) : cyByBias[bias] ?? 0.5;
+  const zr = hint.zoom ?? [1.12, 1.4];
+  const z = Math.max(zr[0], Math.min(zr[1], crop.zoom ?? (zr[0] + zr[1]) / 2));
   return {
     cx: Math.min(0.62, Math.max(0.38, fx + ((crop.cx ?? 0.5) - 0.5) * 0.25)),
     cy: Math.min(0.7, Math.max(0.3, targetCy + ((crop.cy ?? 0.5) - 0.5) * 0.25)),
-    zoom: Math.max(1.12, crop.zoom ?? 1),
+    zoom: z,
   };
 }

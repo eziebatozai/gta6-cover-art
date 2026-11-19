@@ -45,20 +45,20 @@ export function drawArcLine(ctx, raw, cx, y, size, opts = {}) {
   const cap = size * 0.73;
   const outline = opts.outline ?? Math.max(2, size * 0.12);
   const grad = opts.gradient ?? [
-    { at: 0, color: '#fff3cf' },
-    { at: 0.5, color: '#ffbe62' },
-    { at: 1, color: '#e0561f' },
+    { at: 0, color: '#fff5d2' },
+    { at: 0.48, color: '#ffbe62' },
+    { at: 1, color: '#d84f18' },
   ];
   const ink = opts.ink ?? '#1d1026';
 
   ctx.save();
   ctx.font = `${size}px Anton`;
-  ctx.letterSpacing = `${size * 0.02}px`;
+  ctx.letterSpacing = `${size * 0.012}px`;
   ctx.textAlign = 'left';
   ctx.textBaseline = 'alphabetic';
   const chars = [...text];
   const widths = chars.map((c) => ctx.measureText(c).width);
-  const track = size * 0.015;
+  const track = size * 0.012;
   const total = widths.reduce((a, b) => a + b, 0) + track * (chars.length - 1);
   let x = cx - total / 2;
 
@@ -106,7 +106,7 @@ export function drawArcLine(ctx, raw, cx, y, size, opts = {}) {
 
     // Inner highlight: a light kiss along the top of each glyph.
     const hi = ctx.createLinearGradient(0, -cap, 0, -cap * 0.3);
-    hi.addColorStop(0, 'rgba(255,255,255,0.55)');
+    hi.addColorStop(0, 'rgba(255,255,255,0.5)');
     hi.addColorStop(1, 'rgba(255,255,255,0)');
     ctx.fillStyle = hi;
     ctx.fillText(chars[i], 0, 0);

@@ -3,6 +3,8 @@
 // sheet's margin notes. The label always names the plate actually shown: it is resolved from
 // the panel's fill at draw time (plates.js keeps the seeded time line per plate), and only an
 // explicit inspector edit (label.user) can override it. Defaults are seeded per panel.
+// The bar is opaque enough (0.9 at its left edge, 0.74 at its right) and carries a soft blend
+// shadow above it, so the cream text stays readable even over a bright white facade.
 
 import { plateByKey, ART_PLATE } from './plates.js';
 
@@ -59,10 +61,18 @@ export function drawLocatorLabel(ctx, r, label) {
 
   const y = r.y + r.h - barH;
   ctx.save();
-  // The bar: a dark translucent gradient, darkest at its left edge.
+
+  // A soft blend shadow above the bar, so it sits in the photo instead of pasted on it.
+  const blend = ctx.createLinearGradient(r.x, y - barH * 0.45, r.x, y);
+  blend.addColorStop(0, 'rgba(10,6,16,0)');
+  blend.addColorStop(1, 'rgba(10,6,16,0.4)');
+  ctx.fillStyle = blend;
+  ctx.fillRect(r.x, y - barH * 0.45, r.w, barH * 0.45);
+
+  // The bar: a dark translucent gradient, darkest at its left edge — readable on any photo.
   const g = ctx.createLinearGradient(r.x, y, r.x + r.w, y);
-  g.addColorStop(0, 'rgba(12,8,20,0.82)');
-  g.addColorStop(1, 'rgba(12,8,20,0.58)');
+  g.addColorStop(0, 'rgba(10,6,16,0.9)');
+  g.addColorStop(1, 'rgba(10,6,16,0.74)');
   ctx.fillStyle = g;
   ctx.fillRect(r.x, y, r.w, barH);
   // Warm keyline on top of the bar, a print detail.
@@ -74,8 +84,14 @@ export function drawLocatorLabel(ctx, r, label) {
   const baseY = y + barH * (showSub ? 0.48 : 0.62);
   ctx.font = `${nSize}px "Bebas Neue"`;
   ctx.letterSpacing = `${nSize * 0.09}px`;
+  ctx.shadowColor = 'rgba(8,4,12,0.55)';
+  ctx.shadowBlur = nSize * 0.18;
+  ctx.shadowOffsetY = Math.max(1, nSize * 0.06);
   ctx.fillStyle = '#f6efdf';
   ctx.fillText(nameText, r.x + padX, baseY);
+  ctx.shadowColor = 'transparent';
+  ctx.shadowBlur = 0;
+  ctx.shadowOffsetY = 0;
 
   if (showSub) {
     ctx.font = `${sSize}px "Bebas Neue"`;

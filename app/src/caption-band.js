@@ -2,9 +2,9 @@
 // ("VOL. 06") and a 5-star row with a short press quote sit tight against the top of the band,
 // then the huge arched Anton headline with a thick cream outline and warm gradient fill, a
 // clearly readable Pacifico script accent, and (below the band) the thin credit strip.
-// The band owns about 21% of the poster height; the collage owns the rest. Everything is
-// anchored to a 1080-unit scale so 1920x1080, 1080x1080 and 1080x1350 all compose properly
-// instead of merely re-scaling.
+// The band owns about 20% of the poster so the collage owns the rest. Everything is anchored
+// to a 1080-unit scale so 1920x1080, 1080x1080 and 1080x1350 all compose properly instead of
+// merely re-scaling.
 
 import { drawArcLine, fitArcLine, trackedCaps, POSTER_CREAM } from './lettering.js';
 
@@ -12,7 +12,9 @@ import { drawArcLine, fitArcLine, trackedCaps, POSTER_CREAM } from './lettering.
 export function captionGeometry(W, H) {
   const unit = Math.min(W, H) / 1080;
   const creditH = Math.max(22, Math.round(30 * unit));
-  const bandH = Math.round(H * (H >= W ? 0.215 : 0.21));
+  // The wide cinema cover gives the collage a little more room; the portrait formats keep a
+  // touch more band so the headline never feels cramped.
+  const bandH = Math.round(H * (H >= W ? 0.205 : 0.215));
   return { bandH, creditH };
 }
 
@@ -24,12 +26,15 @@ export function drawCreditStrip(ctx, W, H, raw, pal) {
   ctx.save();
   ctx.fillStyle = pal.ink;
   ctx.fillRect(0, H - barH, W, barH);
+  // A hairline cream rule along the strip's top edge — a print detail tying it to the poster.
+  ctx.fillStyle = 'rgba(250,244,230,0.28)';
+  ctx.fillRect(0, H - barH, W, Math.max(1, Math.round(unit)));
   if (text) {
     const size = barH * 0.5;
     trackedCaps(ctx, text, size, 0.34);
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillStyle = 'rgba(250,244,230,0.9)';
+    ctx.fillStyle = 'rgba(250,244,230,0.94)';
     ctx.fillText(text, W / 2, H - barH * 0.5, W * 0.95);
     ctx.letterSpacing = '0px';
   }
@@ -181,7 +186,7 @@ export function drawCaptionBand(ctx, x, y, w, h, state, pal) {
   const cite = String(state.cite ?? '').trim().toUpperCase().slice(0, 30);
   const quoteText = quote ? (cite ? `${quote} \u2014 ${cite}` : quote) : '';
   const starSize = topRowH * 0.46;
-  const starsW = state.stars === false ? 0 : starSize * 5.6;
+  const starsW = state.stars === false ? 0 : starSize * 6.2;
   const centreX0 = x + w * 0.05 + (chipsTexts.length ? w * 0.16 : 0);
   const centreX1 = x + w * 0.95 - usedRight;
   const centreW = Math.max(w * 0.18, centreX1 - centreX0);

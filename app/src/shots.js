@@ -5,14 +5,16 @@
 // `editor` shows the full editor with the photos loaded, a panel preselected and the live
 // preview. Parameters: size, layout, look, seed, headline, script, quote, cite, chips, credit,
 // stars=0, art=0, plates (comma list of plate keys / 'art' / 'user' in panel order), looks
-// (comma list of look names per panel), photo (app-relative path, repeatable, loaded as the
-// person's own photo), panel (preselect index, default 0 in the editor). Everything renders
-// from the seed, never the platform’s random, so the same URL always paints the same pixels. Locator
-// labels follow the fills automatically (each plate owns its name and time line), so a recipe
-// never has to spell them out. window.__shotReady is set once the canvas has painted.
+// (comma list of look names per panel), crops (semicolon list of "i:cx,cy,zoom" pins per
+// panel, for recipes that must pin an exact frame), photo (app-relative path, repeatable,
+// loaded as the person's own photo), panel (preselect index, default 0 in the editor).
+// Everything renders
+// from the seed, never the platform's random, so the same URL always paints the same pixels.
+// Locator labels follow the fills automatically (each plate owns its name and time line), so
+// a recipe never has to spell them out. window.__shotReady is set once the canvas has painted.
 
 import { seedFromString } from './rng.js';
-import { LOOKS, rebuildPanels, cropForFill } from './state.js';
+import { LOOKS, rebuildPanels, cropForFill, clampCrop } from './state.js';
 import { PLATES } from './plates.js';
 
 export async function runShot(shot, query, editor) {
@@ -57,6 +59,15 @@ export async function runShot(shot, query, editor) {
   const plateList = plates ? plates.split(',').map((s) => s.trim()).filter(Boolean) : [];
   const looks = query.get('looks');
   const lookList = looks ? looks.split(',').map((s) => s.trim()).filter(Boolean) : [];
+  const zooms = query.get('zooms');
+  const zoomList = zooms ? zooms.split(',').map((s) => Number(s.trim())).filter((n) => Number.isFinite(n) && n >= 1) : [];
+  // Exact frame pins: "crops=0:0.5,0.5,1.0;4:0.46,0.56,1.05".
+  const cropsRaw = query.get('crops');
+  const cropPins = new Map();
+  for (const part of (cropsRaw ? cropsRaw.split(';') : [])) {
+    const m = /^\s*(\d+)\s*:\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)\s*$/.exec(part);
+    if (m) cropPins.set(Number(m[1]), { cx: Number(m[2]), cy: Number(m[3]), zoom: Number(m[4]) });
+  }
   let userIndex = 0;
   const forced = [];
   state.panels.forEach((panel, i) => {
@@ -85,6 +96,11 @@ export async function runShot(shot, query, editor) {
   // framing of a different photo.
   state.panels.forEach((panel, i) => {
     if (forced[i] && panel.fill !== 'wash') panel.crop = cropForFill(panel.fill, state.seed + i * 131);
+    // A recipe-pinned zoom wins, clamped like any crop so the frame stays on the photo.
+    if (zoomList[i] !== undefined) panel.crop = clampCrop({ ...panel.crop, zoom: zoomList[i] });
+    // An exact frame pin wins over everything, clamped like any crop.
+    const pin = cropPins.get(i);
+    if (pin) panel.crop = clampCrop(pin);
   });
 
   // Preselect a panel so the editor shot shows the selection outline and panel controls.
@@ -107,4 +123,3 @@ export async function runShot(shot, query, editor) {
 function nextFrame() {
   return new Promise((resolve) => requestAnimationFrame(() => resolve()));
 }
-

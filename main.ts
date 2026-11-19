@@ -34,6 +34,10 @@ const DOSSIER_CAPS = {
   app_path_max_bytes: 1000,
 };
 
+// The dossier itself must stay under 1.5 MiB — a headroom check so an overgrown app/ or a
+// bloated dossier is caught here, before it can reach the scorer.
+const DOSSIER_MAX_BYTES = 1.5 * 1024 * 1024;
+
 const screenshotsDir = join(here, 'screenshots');
 if (!existsSync(screenshotsDir)) {
   console.error('main.ts: screenshots/ is missing — run node tools/shots.mjs first.');
@@ -69,6 +73,12 @@ cpSync(screenshotsDir, join(out, 'screenshots'), { recursive: true });
 
 const dossier = buildDossier(out, DOSSIER_CAPS);
 writeFileSync(join(out, 'dossier.json'), dossier);
+if (dossier.length > DOSSIER_MAX_BYTES) {
+  console.error(
+    `main.ts: dossier.json is ${(dossier.length / 1024).toFixed(0)} KiB — over the ${(DOSSIER_MAX_BYTES / 1024 / 1024).toFixed(1)} MiB cap.`,
+  );
+  process.exit(1);
+}
 
 // A short summary of what was handed in, so a human eye sees the shape of the entry.
 const appFiles = listFiles(appDir).length;

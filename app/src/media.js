@@ -1,11 +1,18 @@
 // Loading images: files from the person's machine (read with the File API, never uploaded)
 // and the bundled scene plates, which are plain files under ./samples.
 
-/** Loads an image from an app-relative or blob URL, resolving when it can be drawn. */
+/**
+ * Loads an image from an app-relative or blob URL, resolving when it can be drawn — and fully
+ * decoded where the platform offers a decode() step, so the first draw never stalls on a
+ * half-decoded progressive JPEG.
+ */
 export function loadImage(url) {
   return new Promise((resolve, reject) => {
     const img = new Image();
-    img.onload = () => resolve(img);
+    img.onload = () => {
+      if (img.decode) img.decode().catch(() => {}).finally(() => resolve(img));
+      else resolve(img);
+    };
     img.onerror = () => reject(new Error(`Could not load ${url}`));
     img.src = url;
   });

@@ -1,23 +1,23 @@
 // Collage layouts: each returns the panel rectangles in normalised unit space [0,1]x[0,1] of
 // the panel region. Rectangles are tight and adjacent; the renderer insets each one by half a
-// gutter, so the white gutters between panels are uniform everywhere. The first rect of every
+// gutter, so the gutters between panels stay uniform everywhere. The first rect of every
 // layout is the hero panel (the big one, top of the poster's reading order).
 //
 // The flagship "Collage" follows the classic game-poster grid: one big portrait hero panel on
-// the left (roughly 40% of the width, the full panel-region height) and a mosaic on the right —
-// a wide landscape across the top, two square-ish frames in the middle, a wide one at the
-// bottom and a tall narrow strip. Three arrangements, chosen by the region's aspect, so the
-// same composition adapts to 1920x1080, 1080x1080 and 1080x1350.
+// the left (just under 40% of the width, the full panel-region height) and a mosaic on the
+// right — a wide landscape across the top, two square-ish frames in the middle, a tall narrow
+// strip and a wide one at the bottom. Three arrangements, chosen by the region's aspect, so
+// the same composition adapts to 1920x1080, 1080x1080 and 1080x1350.
 
 /** Wide-cinema arrangement for a landscape region (the 1920x1080 cover). */
 function collageLandscape() {
   return [
-    { x: 0.00, y: 0.00, w: 0.38, h: 1.00 }, // hero
-    { x: 0.38, y: 0.00, w: 0.62, h: 0.40 }, // wide landscape, top right
-    { x: 0.38, y: 0.40, w: 0.22, h: 0.33 }, // square-ish, middle left
-    { x: 0.60, y: 0.40, w: 0.22, h: 0.33 }, // square-ish, middle right
-    { x: 0.82, y: 0.40, w: 0.18, h: 0.60 }, // tall narrow strip
-    { x: 0.38, y: 0.73, w: 0.44, h: 0.27 }, // wide, bottom right
+    { x: 0.00, y: 0.00, w: 0.39, h: 1.00 }, // hero
+    { x: 0.39, y: 0.00, w: 0.61, h: 0.40 }, // wide landscape, top right
+    { x: 0.39, y: 0.40, w: 0.22, h: 0.33 }, // square-ish, middle left
+    { x: 0.61, y: 0.40, w: 0.20, h: 0.33 }, // square-ish, middle right
+    { x: 0.81, y: 0.40, w: 0.19, h: 0.60 }, // tall narrow strip
+    { x: 0.39, y: 0.73, w: 0.42, h: 0.27 }, // wide, bottom right
   ];
 }
 
@@ -26,10 +26,10 @@ function collageSquare() {
   return [
     { x: 0.00, y: 0.00, w: 0.42, h: 1.00 }, // hero, a touch wider so the square poster reads
     { x: 0.42, y: 0.00, w: 0.58, h: 0.32 }, // wide landscape, top right
-    { x: 0.42, y: 0.32, w: 0.28, h: 0.40 }, // square-ish, middle left
-    { x: 0.70, y: 0.32, w: 0.30, h: 0.40 }, // square-ish, middle right
-    { x: 0.42, y: 0.72, w: 0.16, h: 0.28 }, // tall narrow strip
-    { x: 0.58, y: 0.72, w: 0.42, h: 0.28 }, // wide, bottom right
+    { x: 0.42, y: 0.32, w: 0.27, h: 0.40 }, // square-ish, middle left
+    { x: 0.69, y: 0.32, w: 0.31, h: 0.40 }, // square-ish, middle right
+    { x: 0.42, y: 0.72, w: 0.15, h: 0.28 }, // tall narrow strip
+    { x: 0.57, y: 0.72, w: 0.43, h: 0.28 }, // wide, bottom right
   ];
 }
 
@@ -67,7 +67,7 @@ function triptych(aspect) {
   return [
     { x: 0.00, y: 0.00, w: 1.00, h: 1 / 3 },
     { x: 0.00, y: 1 / 3, w: 1.00, h: 1 / 3 },
-    { x: 0.00, y: 2 / 3, w: 1.00, h: 1 / 3 },
+    { x: 0.00, y: 2 / 3, w: 1.00, h: 1 - 2 / 3 },
   ];
 }
 

@@ -1,6 +1,7 @@
 // Export: the cover rendered at the exact chosen size, downloaded as a PNG with a sensible
-// name. `onPhase` lets the editor show progress during the work, and the rendered canvas is
-// created fresh per export so the editor preview never shares buffers with the file.
+// name (headline, the poster's key-light look and the pixel size). `onPhase` lets the editor
+// show progress during the work, and the rendered canvas is created fresh per export so the
+// editor preview never shares buffers with the file.
 
 import { renderCover } from './cover-renderer.js';
 import { SIZES, slug } from './state.js';
@@ -24,7 +25,7 @@ export async function renderExportBlob(state, onPhase) {
 export async function downloadCover(state, onPhase) {
   const blob = await renderExportBlob(state, onPhase);
   const { w, h } = SIZES[state.size] ?? SIZES['1080x1080'];
-  const name = `vice-forge-${slug(state.headline)}-${w}x${h}.png`;
+  const name = `vice-forge-${slug(state.headline)}-${state.look ?? 'vice'}-${w}x${h}.png`;
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;

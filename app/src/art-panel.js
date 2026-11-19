@@ -3,8 +3,10 @@
 // slatted sun with glow, a seeded skyline with lit windows, water with a mirrored-sky
 // reflection, palm silhouettes, birds, stars and sparkles. Every hue comes from the active
 // look's palette, and every random choice from the cover's seed, so it is reproducible.
+// A soft vignette closes the panel edges so the drawn scene sits in the same print world as
+// the photographed panels.
 
-import { makeRng } from './rng.js';
+import { makeRng, chance } from './rng.js';
 
 const ART_PALETTES = {
   sunset: {
@@ -110,6 +112,7 @@ export function drawArtPanel(ctx, x, y, w, h, lookName, seed) {
   drawPalms(ctx, w, h, horizon, p, rng);
   drawSparkles(ctx, w, h, horizon, p, rng);
   drawScanlines(ctx, w, h);
+  drawEdgeShade(ctx, w, h);
 
   ctx.restore();
 }
@@ -195,13 +198,13 @@ function drawSkyline(ctx, w, horizon, h, p, rng, far) {
     const bw = w * (0.03 + rng() * 0.075);
     const bh = layerH * (0.3 + rng() * 0.75);
     ctx.fillRect(bx, baseY - bh, bw, bh); // buildings stop at the horizon; the water runs in front
-    if (!far && bh > layerH * 0.5 && rng() < 0.8) {
+    if (!far && bh > layerH * 0.5 && chance(rng, 0.8)) {
       const cols = Math.max(1, Math.floor(bw / (w * 0.012)));
       const rows = Math.max(1, Math.floor(bh / (h * 0.02)));
       ctx.fillStyle = p.window;
       for (let c = 0; c < cols; c++) {
         for (let r = 0; r < rows; r++) {
-          if (rng() < 0.16) {
+          if (chance(rng, 0.16)) {
             ctx.globalAlpha = 0.35 + rng() * 0.5;
             ctx.fillRect(bx + c * (bw / cols) + bw / cols * 0.3, baseY - bh + r * (bh / rows) + bh / rows * 0.3, Math.max(1, w * 0.003), Math.max(1, h * 0.006));
           }
@@ -276,7 +279,7 @@ function drawClouds(ctx, w, horizon, p, rng) {
     ctx.beginPath();
     ctx.ellipse(cx + cw / 2, cy, cw / 2, ch / 2, 0, 0, Math.PI * 2);
     ctx.fill();
-    if (rng() < 0.6) {
+    if (chance(rng, 0.6)) {
       ctx.beginPath();
       ctx.ellipse(cx + cw * 0.75, cy + ch * 0.3, cw * 0.28, ch * 0.4, 0, 0, Math.PI * 2);
       ctx.fill();
@@ -393,12 +396,21 @@ function drawSparkles(ctx, w, h, horizon, p, rng) {
   ctx.globalAlpha = 1;
 }
 
-/** Subtle CRT scanlines, poster texture — fainter than before so the sun stays the hero. */
+/** Subtle CRT scanlines, poster texture — fainter still so the sun stays the hero. */
 function drawScanlines(ctx, w, h) {
-  ctx.globalAlpha = 0.04;
+  ctx.globalAlpha = 0.03;
   ctx.fillStyle = '#000';
   for (let y = 0; y < h; y += 4) ctx.fillRect(0, y, w, 1);
   ctx.globalAlpha = 1;
+}
+
+/** A soft darkening at the panel's edges, so the drawn scene matches the photo vignettes. */
+function drawEdgeShade(ctx, w, h) {
+  const g = ctx.createRadialGradient(w / 2, h / 2, Math.min(w, h) * 0.44, w / 2, h / 2, Math.max(w, h) * 0.76);
+  g.addColorStop(0, 'rgba(0,0,0,0)');
+  g.addColorStop(1, 'rgba(0,0,0,0.2)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, w, h);
 }
 
 function withAlpha(hex, a) {

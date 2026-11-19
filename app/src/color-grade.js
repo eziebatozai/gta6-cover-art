@@ -9,9 +9,15 @@
 //      highlight guard (pixels above 0.92 luminance keep their hue instead of clipping to white);
 //   5. a per-look tritone gradient map at low strength — neon and vice push it, sunset and heat
 //      stay photographic;
-//   6. bloom on bright pixels only, a vignette and fine grain. (The chromatic fringe runs
-//      first, on the raw photo, so the shadow toe re-crushes any edge bleed.)
-// Every look is tuned so the darkest decile lands near true black and highlights keep a hue.
+//   6. per-plate treatments, bloom on bright pixels only, a vignette and fine grain. (The
+//      chromatic fringe runs first, on the raw photo, so the shadow toe re-crushes any edge
+//      bleed.)
+// Two plates carry their own dusk treatment on top of whatever look the panel wears: DECO
+// CARLYLE gets an indigo-to-magenta dusk sky, a lifted white facade, a warm parapet rim light
+// and a neon entrance glow; ROUTE MOTEL gets an amber-dusk lift that keeps its red/green neon.
+// Sky-heavy plates (SUNSET WATER, MARINA NIGHTS) take a soft gradient wash keyed to their look,
+// so every sky on the poster sits in one palette family. Every look is tuned so the darkest
+// decile lands near true black and highlights keep a hue.
 
 export const LOOK_DEFS = {
   sunset: {
@@ -100,7 +106,24 @@ export function lookDef(name) {
   return LOOK_DEFS[name] ?? LOOK_DEFS.vice;
 }
 
-// Scratch canvases for the grade chain, grown on demand and shared across panels.
+// --- per-plate tone overrides: a plate can pull the look's split-tone toward its own story ---
+
+const PLATE_TONES = {
+  // The deco facade must stay dusk-white: cool near-white highlights, barely any map.
+  carlyle: { shadowTint: '#1a0f42', highlightTint: '#f2ecff', tint: 0.15, sat: 1.2, mapAlpha: 0.05 },
+  // Warm dusk on the route: indigo shadows, amber highlights, the tritone pulled warm so the
+  // red and green neon read as the brightest thing in frame.
+  motel: {
+    shadowTint: '#150e3c',
+    highlightTint: '#ffce8a',
+    tint: 0.27,
+    sat: 1.32,
+    map: ['#0e0826', '#8a4a24', '#ffd9a0'],
+    mapAlpha: 0.14,
+  },
+};
+
+// --- scratch canvases for the grade chain, grown on demand and shared across panels ---
 const scratch = [];
 function getScratch(i, w, h) {
   if (!scratch[i]) scratch[i] = document.createElement('canvas');
@@ -236,7 +259,8 @@ function skinFactor(hue, sat, l, r, g, b) {
 /**
  * The single per-pixel pass: applies the tone LUT, the split-tone with skin guard, the
  * gradient map at its (low) strength, then the guarded saturation boost. One read/one write
- * of the panel's ImageData.
+ * of the panel's ImageData. `opts` may override any part of the split-tone/map — the
+ * per-plate dusk tones use that to pull a look toward the plate's own story.
  */
 function tonePass(ctx, w, h, def, opts = {}) {
   const lut = buildToneLut(ctx, w, h, def);
@@ -244,8 +268,8 @@ function tonePass(ctx, w, h, def, opts = {}) {
   const mapAlpha = opts.mapAlpha ?? def.mapAlpha;
   const tint = opts.tint ?? def.tint;
   const satBoost = opts.sat ?? def.sat;
-  const shadow = hexToRgb(def.shadowTint);
-  const highlight = hexToRgb(def.highlightTint);
+  const shadow = hexToRgb(opts.shadowTint ?? def.shadowTint);
+  const highlight = hexToRgb(opts.highlightTint ?? def.highlightTint);
 
   const data = ctx.getImageData(0, 0, w, h);
   const px = data.data;
@@ -321,14 +345,167 @@ function tonePass(ctx, w, h, def, opts = {}) {
   ctx.putImageData(data, 0, 0);
 }
 
+// ---------------------------------------------------------------------------
+// per-plate dusk treatments: drawn on the graded panel, photographic, subtle.
+// ---------------------------------------------------------------------------
+
+/**
+ * DECO CARLYLE: an indigo-to-magenta dusk sky (a `lighten` gradient, so only the dark sky
+ * picks it up and the bright facade stays white), a crisp facade lift with deeper window
+ * shadows, a warm rim light traced along the parapet (found per column as the dark-to-bright
+ * edge), and a neon wash at the entrance.
+ */
+function duskDeco(ctx, w, h) {
+  // 1. dusk sky: a vertical lighten gradient from deep indigo through violet into magenta,
+  // gone by ~60% down where the facade begins. Bright pixels are untouched by `lighten`.
+  ctx.globalCompositeOperation = 'lighten';
+  const sky = ctx.createLinearGradient(0, 0, 0, h * 0.62);
+  sky.addColorStop(0, 'rgba(34,12,92,0.96)');
+  sky.addColorStop(0.28, 'rgba(104,26,124,0.8)');
+  sky.addColorStop(0.48, 'rgba(198,58,140,0.5)');
+  sky.addColorStop(0.62, 'rgba(0,0,0,0)');
+  ctx.fillStyle = sky;
+  ctx.fillRect(0, 0, w, h);
+
+  // 2. facade: bright pixels lift toward crisp white, the window shadows deepen a touch —
+  // real shadow gradients, not a posterised filter.
+  const data = ctx.getImageData(0, 0, w, h);
+  const px = data.data;
+  const lum = new Float32Array(w * h);
+  for (let i = 0, p = 0; i < px.length; i += 4, p++) {
+    const l = (px[i] * 0.299 + px[i + 1] * 0.587 + px[i + 2] * 0.114) / 255;
+    lum[p] = l;
+    if (l > 0.45) {
+      // The lift target is a warm paper-white, so the facade comes up crisp and sun-kissed
+      // instead of keeping the cool cast of the dusk sky.
+      const k = Math.min(1, (l - 0.45) / 0.4) * 0.42;
+      px[i] += (255 - px[i]) * k;
+      px[i + 1] += (250 - px[i + 1]) * k;
+      px[i + 2] += (240 - px[i + 2]) * k;
+    } else if (l < 0.28) {
+      const k = 0.92 + 0.08 * (l / 0.28);
+      px[i] *= k;
+      px[i + 1] *= k;
+      px[i + 2] *= k;
+    }
+  }
+
+  // 3. parapet rim light: the first dark-to-bright edge in each column, inside the top 60%,
+  // traced with a 3px warm additive falloff. A slow deterministic ripple keeps it organic.
+  const scanEnd = Math.round(h * 0.6);
+  ctx.globalCompositeOperation = 'lighter';
+  for (let x = 0; x < w; x++) {
+    let ry = -1;
+    for (let y = 1; y < scanEnd; y++) {
+      if (lum[(y - 1) * w + x] < 0.35 && lum[y * w + x] >= 0.55) {
+        ry = y;
+        break;
+      }
+    }
+    if (ry < 0) continue;
+    const ripple = 0.7 + 0.3 * (((x * 7919) % 17) / 17);
+    for (let dy = 0; dy < 3; dy++) {
+      const y = ry + dy;
+      if (y >= h) break;
+      const f = (1 - dy / 3) * 0.5 * ripple;
+      const i = (y * w + x) * 4;
+      px[i] = Math.min(255, px[i] + 235 * f);
+      px[i + 1] = Math.min(255, px[i + 1] + 165 * f);
+      px[i + 2] = Math.min(255, px[i + 2] + 95 * f);
+    }
+  }
+  ctx.putImageData(data, 0, 0);
+  ctx.globalCompositeOperation = 'source-over';
+
+  // 4. entrance: a neon wash rising from the bottom edge, screen-blended so only the dark
+  // doorway and lower facade glow.
+  ctx.globalCompositeOperation = 'screen';
+  const glow = ctx.createRadialGradient(w * 0.5, h * 1.08, h * 0.04, w * 0.5, h * 1.08, h * 0.55);
+  glow.addColorStop(0, 'rgba(255,104,158,0.34)');
+  glow.addColorStop(0.55, 'rgba(255,104,158,0.1)');
+  glow.addColorStop(1, 'rgba(255,104,158,0)');
+  ctx.fillStyle = glow;
+  ctx.fillRect(0, h * 0.45, w, h * 0.55);
+  ctx.globalCompositeOperation = 'source-over';
+}
+
+/**
+ * ROUTE MOTEL: an amber-dusk lift over the whole frame — a `lighten` gradient (indigo at the
+ * top of the sky through amber at the horizon, transparent over the bright neon) so the big
+ * dark sky and the dark ground fall into one dusk palette while the red/green neon, the
+ * brightest pixels in frame, are untouched and stay the story.
+ */
+function duskRoute(ctx, w, h) {
+  ctx.globalCompositeOperation = 'lighten';
+  const sky = ctx.createLinearGradient(0, 0, 0, h);
+  sky.addColorStop(0, 'rgba(30,20,80,0.92)');
+  sky.addColorStop(0.36, 'rgba(92,42,100,0.5)');
+  sky.addColorStop(0.56, 'rgba(200,102,46,0.46)');
+  sky.addColorStop(0.78, 'rgba(150,82,36,0.26)');
+  sky.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = sky;
+  ctx.fillRect(0, 0, w, h);
+  // A soft warm screen over the lower third: the dark desert ground picks up the last of the
+  // dusk without dimming the neon above it.
+  ctx.globalCompositeOperation = 'screen';
+  const ground = ctx.createLinearGradient(0, h * 0.62, 0, h);
+  ground.addColorStop(0, 'rgba(96,52,26,0)');
+  ground.addColorStop(1, 'rgba(96,52,26,0.35)');
+  ctx.fillStyle = ground;
+  ctx.fillRect(0, h * 0.62, w, h * 0.38);
+  ctx.globalCompositeOperation = 'source-over';
+}
+
+/**
+ * Sky-heavy plates (SUNSET WATER, MARINA NIGHTS): a soft gradient wash keyed to the panel's
+ * look — its shadow hue over the top of the frame, its warm highlight tint across the horizon
+ * band — so every sky on the poster shares one palette family without flattening the photo.
+ */
+function skyWash(ctx, w, h, def) {
+  const shadow = hexToRgb(def.shadowTint);
+  const warm = hexToRgb(def.highlightTint);
+  ctx.globalCompositeOperation = 'soft-light';
+  const g = ctx.createLinearGradient(0, 0, 0, h);
+  g.addColorStop(0, `rgba(${shadow[0]},${shadow[1]},${shadow[2]},0.4)`);
+  g.addColorStop(0.38, `rgba(${shadow[0]},${shadow[1]},${shadow[2]},0.16)`);
+  g.addColorStop(0.58, `rgba(${warm[0]},${warm[1]},${warm[2]},0.2)`);
+  g.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, w, h);
+  // A second, fainter overlay pass ties the wash into the midtones as well.
+  ctx.globalCompositeOperation = 'overlay';
+  ctx.globalAlpha = 0.35;
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, w, h);
+  ctx.globalAlpha = 1;
+  ctx.globalCompositeOperation = 'source-over';
+}
+
+/** Zeros every pixel below the bloom knee and soft-knees the rest, in place. */
+function bloomMask(ctx, w, h) {
+  const data = ctx.getImageData(0, 0, w, h);
+  const px = data.data;
+  for (let i = 0; i < px.length; i += 4) {
+    const l = (px[i] * 0.299 + px[i + 1] * 0.587 + px[i + 2] * 0.114) / 255;
+    const f = clamp01((l - 0.76) / 0.14);
+    const s = f * f;
+    px[i] *= s;
+    px[i + 1] *= s;
+    px[i + 2] *= s;
+  }
+  ctx.putImageData(data, 0, 0);
+}
+
 /**
  * Draws `img` through the crop source rect into a scratch canvas at panel size (pw, ph), runs
- * the full grade chain and returns that canvas ready to blit into the cover. `treat` selects
- * 'grade' (the film chain above) or 'duotone' (a hard two-tone print of the look's palette);
- * any other value falls back to 'grade'.
+ * the full grade chain and returns that canvas ready to blit into the cover. `opts` carries
+ *   treat — 'grade' (the film chain) or 'duotone' (a hard two-tone print of the palette);
+ *   plate — the plate definition actually shown, for its dusk treatment, sky wash and
+ *           per-plate tone overrides. Anything else falls back to the plain grade.
  */
-export function gradePhoto(img, src, pw, ph, lookName, seed, treat = 'grade') {
+export function gradePhoto(img, src, pw, ph, lookName, seed, opts = {}) {
   const def = lookDef(lookName);
+  const plate = opts.plate ?? null;
   const w = Math.max(2, Math.round(pw));
   const h = Math.max(2, Math.round(ph));
   const base = getScratch(0, w, h);
@@ -381,10 +558,26 @@ export function gradePhoto(img, src, pw, ph, lookName, seed, treat = 'grade') {
   }
 
   // --- 1-5: levels, curve, split-tone, gradient map, guarded saturation (one pixel pass) ---
-  const duo = treat === 'duotone';
-  tonePass(bctx, w, h, def, duo
+  const duo = opts.treat === 'duotone';
+  const plateTone = plate ? PLATE_TONES[plate.treat] ?? null : null;
+  const tone = duo
     ? { map: [def.map[0], def.map[0], def.map[2]], mapAlpha: 0.85, tint: def.tint * 0.6 }
-    : {});
+    : plateTone
+      ? {
+          map: plateTone.map ?? def.map,
+          mapAlpha: plateTone.mapAlpha ?? def.mapAlpha,
+          tint: plateTone.tint ?? def.tint,
+          sat: plateTone.sat ?? def.sat,
+          shadowTint: plateTone.shadowTint ?? def.shadowTint,
+          highlightTint: plateTone.highlightTint ?? def.highlightTint,
+        }
+      : {};
+  tonePass(bctx, w, h, def, tone);
+
+  // --- per-plate dusk treatments and the sky wash, before bloom so new highlights glow too ---
+  if (plate?.treat === 'dusk-deco') duskDeco(bctx, w, h);
+  if (plate?.treat === 'dusk-route') duskRoute(bctx, w, h);
+  if (plate?.skyWash) skyWash(bctx, w, h, def);
 
   // --- 6a: bloom, only on bright pixels. First a hard threshold pass keeps just the pixels
   // above the bloom knee (~0.78 luminance), then that highlight mask is blurred and
@@ -407,21 +600,6 @@ export function gradePhoto(img, src, pw, ph, lookName, seed, treat = 'grade') {
     bctx.globalAlpha = 1;
     bctx.globalCompositeOperation = 'source-over';
   }
-
-/** Zeros every pixel below the bloom knee and soft-knees the rest, in place. */
-function bloomMask(ctx, w, h) {
-  const data = ctx.getImageData(0, 0, w, h);
-  const px = data.data;
-  for (let i = 0; i < px.length; i += 4) {
-    const l = (px[i] * 0.299 + px[i + 1] * 0.587 + px[i + 2] * 0.114) / 255;
-    const f = clamp01((l - 0.76) / 0.14);
-    const s = f * f;
-    px[i] *= s;
-    px[i + 1] *= s;
-    px[i + 2] *= s;
-  }
-  ctx.putImageData(data, 0, 0);
-}
 
   // --- 6b: vignette.
   const vig = bctx.createRadialGradient(w / 2, h / 2, Math.min(w, h) * 0.42, w / 2, h / 2, Math.max(w, h) * 0.78);

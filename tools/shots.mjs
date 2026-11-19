@@ -1,7 +1,9 @@
 // Screenshot driver: serves app/ on a free port, opens each recipe from shots.json in headless
 // Chromium (Playwright), waits for window.__shotReady, and writes the JPEGs into screenshots/.
 // Every written JPEG is checked against the entry's caps — ≤ 256 KiB, long side ≤ 1280,
-// short side ≥ 480 — and the driver fails loudly when a recipe breaks one.
+// short side ≥ 480 — and against the recipe's own declared dimensions (parsed from the JPEG's
+// SOF marker, so a driver bug can never silently rescale a shot). The driver fails loudly
+// when a recipe breaks any of those.
 // `node tools/shots.mjs --exports` additionally verifies the export path: in the editor it
 // clicks Export for all three sizes and checks each downloaded PNG's IHDR dimensions.
 
@@ -120,6 +122,10 @@ if (process.argv.includes('--exports')) {
     const short = Math.min(r.w, r.h);
     if (long > MAX_LONG) problems.push(`long side ${long} > ${MAX_LONG}`);
     if (short < MIN_SHORT) problems.push(`short side ${short} < ${MIN_SHORT}`);
+    // The pixels on disk must really be the recipe's size: parse the JPEG's SOF marker.
+    const dims = jpegSize(out);
+    if (!dims) problems.push('not a decodable JPEG');
+    else if (dims.w !== r.w || dims.h !== r.h) problems.push(`SOF says ${dims.w}x${dims.h}, recipe says ${r.w}x${r.h}`);
     console.log(`${r.name}: ${r.w}x${r.h}, ${(bytes / 1024).toFixed(0)} KiB${problems.length ? ` — FAIL: ${problems.join(', ')}` : ''}`);
     if (problems.length) process.exitCode = 1;
     await page.close();
@@ -137,4 +143,22 @@ function checkPngSize(file, w, h) {
   const iw = buf.readUInt32BE(16);
   const ih = buf.readUInt32BE(20);
   return iw === w && ih === h;
+}
+
+/** Reads a JPEG's SOF0/SOF2 frame header for its real pixel dimensions, or null. */
+function jpegSize(file) {
+  const buf = readFileSync(file);
+  if (buf.readUInt16BE(0) !== 0xffd8) return null;
+  let off = 2;
+  while (off + 9 < buf.length) {
+    if (buf[off] !== 0xff) return null;
+    const marker = buf[off + 1];
+    const len = buf.readUInt16BE(off + 2);
+    if ((marker >= 0xc0 && marker <= 0xc3) || (marker >= 0xc5 && marker <= 0xc7) ||
+        (marker >= 0xc9 && marker <= 0xcb) || (marker >= 0xcd && marker <= 0xcf)) {
+      return { h: buf.readUInt16BE(off + 5), w: buf.readUInt16BE(off + 7) };
+    }
+    off += 2 + len;
+  }
+  return null;
 }

@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
 <title>VICE FORGE — GTA-style poster maker</title>
 <link rel="stylesheet" href="./style.css">
 </head>
@@ -14,7 +15,7 @@
       <div class="brand-mark">
         <span class="brand-vice">VICE</span><span class="brand-forge">FORGE</span>
       </div>
-      <p class="brand-sub">GTA-style poster covers, forged from your own photos. Offline, no upload, film-grade colour.</p>
+      <p class="brand-sub">GTA-style poster covers, forged from your own photos. Offline, no upload, film-grade colour, one unified print pass.</p>
     </header>
 
     <section class="panel">
@@ -36,7 +37,7 @@
         </label>
         <button id="reshuffle" type="button" class="btn btn-mini" title="New seed: re-deal plates, grades &amp; labels">Reshuffle &#10227;</button>
       </div>
-      <p class="mini">Each panel gets its own look from the seed — neighbours never match, and the hero always carries the warm sunset key light.</p>
+      <p class="mini">Each panel gets its own look from the seed — neighbours never match, the hero carries the warm sunset key, and one print pass unifies the sheet.</p>
     </section>
   </aside>
 
@@ -44,7 +45,7 @@
     <div class="stage-inner" id="stageInner">
       <canvas id="cover" width="1080" height="1080" aria-label="Cover preview"></canvas>
     </div>
-    <footer class="hint" id="hint">Click a panel to select · drag to pan · wheel to zoom · <kbd>E</kbd> export · <kbd>Tab</kbd> cycle · drop photos to add</footer>
+    <footer class="hint" id="hint">Click a panel to select · drag to pan · wheel to zoom · double-click resets · <kbd>F</kbd> auto-frame · <kbd>E</kbd> export · <kbd>Tab</kbd> cycle</footer>
   </section>
 
   <aside class="bar bar-right" id="rightbar">
@@ -72,7 +73,7 @@
           <button id="resetCrop" type="button" class="btn btn-block">Reset</button>
         </div>
       </div>
-      <p class="mini">Select a panel on the preview, then set what fills it and how it is graded. Locator labels follow the plate you pick; edit a label to lock it.</p>
+      <p class="mini">Select a panel on the preview, then set what fills it and how it is graded. Auto-frame honours each plate's own story — the motel keeps its sign, building and car.</p>
     </section>
 
     <section class="panel">
@@ -113,7 +114,7 @@
       <p class="mini" id="exportMeta">1080 × 1080</p>
       <button id="export" type="button" class="btn btn-export">Export PNG</button>
       <p class="mini status-line" id="status" role="status">Ready.</p>
-      <p class="mini hint-keys"><kbd>E</kbd> export · <kbd>←→↑↓</kbd> nudge crop · <kbd>Shift</kbd> big steps</p>
+      <p class="mini hint-keys"><kbd>E</kbd> export · <kbd>F</kbd> auto-frame · <kbd>←→↑↓</kbd> nudge crop · <kbd>Shift</kbd> big steps</p>
     </section>
   </aside>
 

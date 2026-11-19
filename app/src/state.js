@@ -77,20 +77,21 @@ function panelCountOf(state) {
 
 /**
  * A believable default crop for a panel: around the plate's focus, honouring its framing bias
- * ('low' plates sit lower in frame, 'high' plates higher), with a slight seeded punch-in.
+ * ('low' plates tell their story in the lower two thirds, 'high' plates sit just above mid),
+ * with a slight seeded punch-in inside the plate's own zoom range.
  */
 function seededCrop(rng, plate) {
   const framing = plate?.framing ?? 'centre';
-  const biasCy = { low: 0.6, high: 0.36, centre: 0.48 }[framing] ?? 0.48;
+  const biasCy = { low: 0.58, high: 0.42, centre: 0.48 }[framing] ?? 0.48;
   const fx = plate?.focus?.[0] ?? 0.5;
-  // 'low' plates (water/road/pier) carry big empty skies, so they also punch in deeper; 'high'
-  // plates (neon signs, skylines) need the zoom too, so the clamp leaves their headroom usable.
+  // The zoom range is the plate's own when it declares one — a wide story (the motel sign,
+  // building and car) needs the widest frame — else the framing's default range.
   const zoomRange = plate?.zoom
-    ?? { low: [1.24, 1.5], high: [1.24, 1.4], centre: [1.06, 1.26] }[framing]
-    ?? [1.06, 1.26];
+    ?? { low: [1.08, 1.28], high: [1.2, 1.45], centre: [1.05, 1.2] }[framing]
+    ?? [1.05, 1.2];
   return {
     cx: Math.min(0.62, Math.max(0.38, fx + between(rng, -0.03, 0.03))),
-    cy: Math.min(0.7, Math.max(0.3, biasCy + between(rng, -0.025, 0.025))),
+    cy: Math.min(0.7, Math.max(0.3, biasCy + between(rng, -0.02, 0.02))),
     zoom: between(rng, zoomRange[0], zoomRange[1]),
   };
 }
